@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Flower2, Calendar, Clock, User, Phone, Mail, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -16,6 +16,10 @@ export default function BookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  // NEW: availability state
+  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+
   const services = [
     'Full Body Massage',
     'Deep Cleansing Facial',
@@ -26,11 +30,150 @@ export default function BookingPage() {
 
   const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/levm75ny7sndfg22njcofbsb2shnjiwo';
 
+  // ---------------------------
+  // Helpers (opening hours + slots)
+  // ---------------------------
+
+  // 0 = Sun ... 6 = Sat
+  const HOURS: Record<number, { open: string; close: string }> = {
+    0: { open: '10:00', close: '21:00' }, // Sunday
+    1: { open: '10:00', close: '21:00' }, // Monday
+    2: { open: '10:00', close: '21:00' }, // Tuesday
+    3: { open: '10:30', close: '22:00' }, // Wednesday
+    4: { open: '10:30', close: '22:00' }, // Thursday
+    5: { open: '10:30', close: '22:00' }, // Friday
+    6: { open: '10:30', close: '22:00' }  // Saturday
+  };
+
+  // per-service durations (minutes)
+  const serviceDuration = useMemo(() => {
+    switch (formData.service_type) {
+      case "Couple's Package": return 90;
+      case 'Body Scrub & Glow': return 75;
+      default: return 60; // Full Body Massage, Facial, Aromatherapy
+    }
+  }, [formData.service_type]);
+
+  // Generate all potential slots for a given date respecting opening hours
+  function generateSlotsForDate(
+    dateISO: string,            // "YYYY-MM-DD"
+    durationMins: number,
+    bufferMins = 0,
+    leadTimeMins = 120          // prevent offering very short-notice slots
+  ): string[] {
+    if (!dateISO) return [];
+
+    const [y, m, d] = dateISO.split('-').map(Number);
+    const localDate = new Date(y, m - 1, d);
+    const dow = localDate.getDay();
+    const hours = HOURS[dow];
+    if (!hours) return [];
+
+    const [oh, om] = hours.open.split(':').map(Number);
+    const [ch, cm] = hours.close.split(':').map(Number);
+
+    const start = new Date(y, m - 1, d, oh, om, 0);
+    const end   = new Date(y, m - 1, d, ch, cm, 0);
+
+    // Apply lead time if booking for today
+    const now = new Date();
+    if (start.toDateString() === now.toDateString()) {
+      const minStart = new Date(now.getTime() + leadTimeMins * 60000);
+      if (minStart > start) {
+        start.setTime(minStart.getTime());
+        // snap minutes to next 5-min mark so labels look clean
+        start.setMinutes(Math.ceil(start.getMinutes() / 5) * 5, 0, 0);
+      }
+    }
+
+    const slots: string[] = [];
+    const step = (durationMins + bufferMins) * 60000;
+
+    for (let t = start.getTime(); t + durationMins * 60000 <= end.getTime(); t += step) {
+      const dt = new Date(t);
+      const hh = String(dt.getHours()).padStart(2, '0');
+      const mm = String(dt.getMinutes()).padStart(2, '0');
+      slots.push(`${hh}:${mm}`);
+    }
+    return slots;
+  }
+
+  function formatTimeLabel(hhmm: string) {
+    const [hh, mm] = hhmm.split(':').map(Number);
+    const dt = new Date(0, 0, 0, hh, mm);
+    return dt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // recompute slots & fetch booked slots when date or service changes
+  useEffect(() => {
+    async function refreshAvailability() {
+      const { preferred_date, service_type } = formData;
+
+      if (!preferred_date || !service_type) {
+        setBookedTimes([]);
+        setAvailableTimes([]);
+        return;
+      }
+
+      // 1) All possible slots for this date/service
+      const allSlots = generateSlotsForDate(preferred_date, serviceDuration, 0, 120);
+
+      // 2) Fetch already booked times (pending + confirmed)
+      const { data, error } = await supabase
+        .from('bookings')
+        .select('preferred_time, status')
+        .eq('preferred_date', preferred_date)
+        .eq('service_type', service_type)
+        .in('status', ['pending', 'confirmed']);
+
+      if (error) {
+        console.error('Error loading booked slots', error);
+        setBookedTimes([]);
+        setAvailableTimes(allSlots);
+        return;
+      }
+
+      const taken = (data ?? []).map((r: any) => String(r.preferred_time).slice(0, 5));
+      setBookedTimes(taken);
+
+      const free = allSlots.filter((t) => !taken.includes(t));
+      setAvailableTimes(free);
+
+      // Clear selected time if it just became unavailable
+      if (formData.preferred_time && !free.includes(formData.preferred_time)) {
+        setFormData((s) => ({ ...s, preferred_time: '' }));
+      }
+    }
+
+    refreshAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.preferred_date, formData.service_type, serviceDuration]);
+
+  const todayISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      // Re-check the slot right before insert (race-condition safe)
+      const { data: clash, error: clashErr } = await supabase
+        .from('bookings')
+        .select('id', { count: 'exact', head: true })
+        .eq('service_type', formData.service_type)
+        .eq('preferred_date', formData.preferred_date)
+        .eq('preferred_time', formData.preferred_time)
+        .in('status', ['pending', 'confirmed']);
+
+      if (clashErr) {
+        console.error('Availability re-check failed:', clashErr);
+      } else if ((clash as any)?.length > 0) {
+        alert('Sorry, that slot was just taken. Please choose another time.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Proceed with insert (status defaults to 'pending' in DB)
       const { error } = await supabase.from('bookings').insert([
         {
           name: formData.name,
@@ -45,6 +188,7 @@ export default function BookingPage() {
 
       if (error) throw error;
 
+      // Webhook (best-effort)
       const payload = {
         name: formData.name,
         whatsapp: formData.whatsapp,
@@ -112,6 +256,8 @@ export default function BookingPage() {
                 preferred_time: '',
                 notes: ''
               });
+              setAvailableTimes([]);
+              setBookedTimes([]);
             }}
             className="mt-8 px-8 py-4 bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
           >
@@ -230,6 +376,7 @@ export default function BookingPage() {
                   <input
                     type="date"
                     required
+                    min={todayISO}
                     value={formData.preferred_date}
                     onChange={(e) => setFormData({ ...formData, preferred_date: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#C9A9A6] focus:ring-0 transition-colors"
@@ -241,13 +388,35 @@ export default function BookingPage() {
                     <Clock className="w-4 h-4 inline mr-2" />
                     Preferred Time
                   </label>
-                  <input
-                    type="time"
+
+                  {/* Replaces <input type="time"> with a select bound to availableTimes */}
+                  <select
                     required
                     value={formData.preferred_time}
                     onChange={(e) => setFormData({ ...formData, preferred_time: e.target.value })}
                     className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#C9A9A6] focus:ring-0 transition-colors"
-                  />
+                    disabled={!formData.preferred_date || !formData.service_type}
+                  >
+                    <option value="">
+                      {!formData.preferred_date
+                        ? 'Select a date first'
+                        : !formData.service_type
+                        ? 'Select a service first'
+                        : availableTimes.length
+                        ? 'Select a time'
+                        : 'Fully booked for this date'}
+                    </option>
+
+                    {availableTimes.map((t) => (
+                      <option key={t} value={t}>{formatTimeLabel(t)}</option>
+                    ))}
+                  </select>
+
+                  {bookedTimes.length > 0 && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      {bookedTimes.length} slot{bookedTimes.length > 1 ? 's' : ''} already booked.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -273,7 +442,7 @@ export default function BookingPage() {
               </button>
             </form>
 
-             {/* ✅ NEW FOOTER BANNER IMAGE (full width) */}
+            {/* ✅ NEW FOOTER BANNER IMAGE (full width) */}
             <div className="mt-12">
               <img
                 src="/form-top-banner.jpg"
@@ -281,7 +450,7 @@ export default function BookingPage() {
                 className="w-full h-56 md:h-72 object-cover rounded-t-3xl"
               />
             </div>
-            
+
             {/* ✅ FOOTER INFO */}
             <footer className="mt-8 text-center text-xs sm:text-sm text-gray-600">
               <div className="inline-block px-4 py-3 bg-[#FFF8F0] rounded-xl shadow-inner">
@@ -294,8 +463,6 @@ export default function BookingPage() {
                 </p>
               </div>
             </footer>
-
-           
           </div>
         </div>
       </div>
