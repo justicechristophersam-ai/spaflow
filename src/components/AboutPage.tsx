@@ -43,7 +43,7 @@ export default function AboutPage({ onNavigate }: AboutPageProps) {
       </header>
 
       {/* MAIN CONTENT */}
-      <main className="max-w-4xl mx-auto px-4 -mt-8 pb-16">
+      <main className="max-w-4xl mx-auto px-4 mt-6 md:-mt-10 pb-16 relative z-10">
         {/* White card with intro text and an intro image */}
 <section className="bg-white rounded-2xl shadow-xl overflow-hidden">
   <div className="p-4 sm:p-6 md:p-8">
