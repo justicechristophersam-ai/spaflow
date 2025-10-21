@@ -1,49 +1,31 @@
 /*
-  # Update bookings table for LunaBloom Spa availability logic
+  # Secure availability via RPC (no anon table reads)
 
-  1. Existing table stays the same — we’re adding:
-     - `status` column (default 'pending')
-     - Unique index on (service_type, preferred_date, preferred_time)
-       for active bookings only
-     - Lookup index to speed up availability queries
+  Adds:
+    - get_booked_slots(date d, text s) → (preferred_time text, status text)
+    - slot_taken(date d, text s, text t) → bool
+  Grants EXECUTE to anon only on these functions.
 
-  2. Add RLS policy to allow anon (public) read access ONLY to
-     future bookings for checking available times.
+  Removes:
+    - The anon SELECT policy used previously for availability.
 */
 
--- 🧘‍♀️ Ensure bookings table exists
-CREATE TABLE IF NOT EXISTS public.bookings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  whatsapp text NOT NULL,
-  email text DEFAULT '',
-  service_type text NOT NULL,
-  preferred_date date NOT NULL,
-  preferred_time text NOT NULL,
-  notes text DEFAULT '',
-  created_at timestamptz DEFAULT now()
-);
-
--- ✅ New column for booking lifecycle
+-- Keep these from the previous migration (no-op if already present)
 ALTER TABLE public.bookings
   ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending';
 
--- ✅ Unique active booking per service/date/time
 CREATE UNIQUE INDEX IF NOT EXISTS bookings_unique_active_slot
 ON public.bookings (service_type, preferred_date, preferred_time)
-WHERE status IN ('pending', 'confirmed');
+WHERE status IN ('pending','confirmed');
 
--- ✅ Lookup index for faster frontend availability queries
 CREATE INDEX IF NOT EXISTS bookings_lookup_idx
 ON public.bookings (preferred_date, service_type, status);
 
--- ✅ Enable Row Level Security (keep your setup)
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 
--- 🔒 Keep your existing policies
+-- Keep original policies (insert for anon, select for authenticated)
 DO $$
 BEGIN
-  -- Insert policy (public booking)
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE policyname = 'Anyone can create bookings'
@@ -56,7 +38,6 @@ BEGIN
       WITH CHECK (true);
   END IF;
 
-  -- Select policy (staff)
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE policyname = 'Authenticated users can view all bookings'
@@ -70,21 +51,57 @@ BEGIN
   END IF;
 END $$;
 
--- ✅ NEW: allow public read only for future dates (for availability)
+-- 🔒 Remove anon table read for availability if it exists
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF EXISTS (
     SELECT 1 FROM pg_policies
     WHERE policyname = 'Anon can read future availability only'
       AND tablename = 'bookings'
   ) THEN
-    CREATE POLICY "Anon can read future availability only"
-      ON public.bookings
-      FOR SELECT
-      TO anon
-      USING (preferred_date >= CURRENT_DATE);
+    DROP POLICY "Anon can read future availability only" ON public.bookings;
   END IF;
 END $$;
 
-COMMENT ON TABLE public.bookings IS
-'LunaBloom Spa bookings with unique per-slot restriction and limited public read access for availability checks.';
+-- ✅ RPC: list booked slots for a given date+service
+CREATE OR REPLACE FUNCTION public.get_booked_slots(d date, s text)
+RETURNS TABLE(preferred_time text, status text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT preferred_time, status
+  FROM public.bookings
+  WHERE preferred_date = d
+    AND service_type   = s
+    AND status IN ('pending','confirmed');
+$$;
+
+REVOKE ALL ON FUNCTION public.get_booked_slots(date, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_booked_slots(date, text) TO anon;
+
+-- ✅ RPC: quick boolean to check if a slot is already taken
+CREATE OR REPLACE FUNCTION public.slot_taken(d date, s text, t text)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.bookings
+    WHERE preferred_date = d
+      AND service_type   = s
+      AND preferred_time = t
+      AND status IN ('pending','confirmed')
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.slot_taken(date, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.slot_taken(date, text, text) TO anon;
+
+COMMENT ON FUNCTION public.get_booked_slots(date, text) IS
+'Returns booked times (pending/confirmed) for availability rendering.';
+
+COMMENT ON FUNCTION public.slot_taken(date, text, text) IS
+'Fast boolean to re-check a slot just before insert.';
