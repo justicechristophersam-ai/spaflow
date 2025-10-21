@@ -273,6 +273,15 @@ export default function BookingPage() {
               </button>
             </form>
 
+             {/* ✅ NEW FOOTER BANNER IMAGE (full width) */}
+            <div className="mt-12">
+              <img
+                src="/form-top-banner.jpg"
+                alt="Spa interior footer banner"
+                className="w-full h-56 md:h-72 object-cover rounded-t-3xl"
+              />
+            </div>
+            
             {/* ✅ FOOTER INFO */}
             <footer className="mt-8 text-center text-xs sm:text-sm text-gray-600">
               <div className="inline-block px-4 py-3 bg-[#FFF8F0] rounded-xl shadow-inner">
@@ -286,14 +295,7 @@ export default function BookingPage() {
               </div>
             </footer>
 
-            {/* ✅ NEW FOOTER BANNER IMAGE (full width) */}
-            <div className="mt-12">
-              <img
-                src="/form-top-banner.jpg"
-                alt="Spa interior footer banner"
-                className="w-full h-56 md:h-72 object-cover rounded-t-3xl"
-              />
-            </div>
+           
           </div>
         </div>
       </div>
