@@ -145,7 +145,7 @@ export default function BookingPage() {
       </div>
 
       {/* ✅ FORM SECTION */}
-      <div className="max-w-4xl mx-auto px-4 -mt-12 pb-20">
+      <div className="max-w-4xl mx-auto px-4 mt-6 md:-mt-12 pb-20 relative z-10">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* 🩷 Removed the old top banner here */}
 
