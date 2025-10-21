@@ -24,11 +24,14 @@ export default function BookingPage() {
     "Couple's Package"
   ];
 
+  const MAKE_WEBHOOK_URL = 'https://hook.us2.make.com/levm75ny7sndfg22njcofbsb2shnjiwo';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
+      // 1) Insert into Supabase (existing behaviour)
       const { error } = await supabase.from('bookings').insert([
         {
           name: formData.name,
@@ -43,6 +46,33 @@ export default function BookingPage() {
 
       if (error) throw error;
 
+      // 2) POST to Make webhook (non-blocking for UX)
+      // Build payload (add a "source" so you can track origin in the sheet)
+      const payload = {
+        name: formData.name,
+        whatsapp: formData.whatsapp,
+        email: formData.email || '',
+        service_type: formData.service_type,
+        preferred_date: formData.preferred_date,
+        preferred_time: formData.preferred_time,
+        notes: formData.notes || '',
+        source: 'Bolt_Form'
+      };
+
+      try {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        // Optionally: you can log success if you want
+        // console.log('Webhook POST successful');
+      } catch (webhookErr) {
+        // Log webhook errors but do not block user flow
+        console.error('Error sending booking to Make webhook:', webhookErr);
+      }
+
+      // 3) Show the success screen (booking saved)
       setIsSuccess(true);
     } catch (error) {
       console.error('Error submitting booking:', error);
