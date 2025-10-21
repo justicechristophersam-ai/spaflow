@@ -108,7 +108,7 @@ export default function BookingPage() {
 
             {/* ✅ Decorative Image */}
             <img
-              src="/thankyou-flowers.png"
+              src="/success-bg.jpg"
               alt="Decorative flowers"
               className="mx-auto mt-8 w-40 h-auto opacity-80"
             />
