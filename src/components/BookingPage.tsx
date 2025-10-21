@@ -193,6 +193,7 @@ export default function BookingPage() {
                 </label>
                 <input
                   type="email"
+                  required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#C9A9A6] focus:ring-0 transition-colors"
