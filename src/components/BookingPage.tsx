@@ -31,7 +31,6 @@ export default function BookingPage() {
     setIsSubmitting(true);
 
     try {
-      // 1) Insert into Supabase (existing behaviour)
       const { error } = await supabase.from('bookings').insert([
         {
           name: formData.name,
@@ -46,8 +45,6 @@ export default function BookingPage() {
 
       if (error) throw error;
 
-      // 2) POST to Make webhook (non-blocking for UX)
-      // Build payload (add a "source" so you can track origin in the sheet)
       const payload = {
         name: formData.name,
         whatsapp: formData.whatsapp,
@@ -65,14 +62,10 @@ export default function BookingPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        // Optionally: you can log success if you want
-        // console.log('Webhook POST successful');
       } catch (webhookErr) {
-        // Log webhook errors but do not block user flow
         console.error('Error sending booking to Make webhook:', webhookErr);
       }
 
-      // 3) Show the success screen (booking saved)
       setIsSuccess(true);
     } catch (error) {
       console.error('Error submitting booking:', error);
@@ -83,74 +76,63 @@ export default function BookingPage() {
   };
 
   // ✅ SUCCESS SCREEN
-if (isSuccess) {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 relative">
-      {/* ✅ Background Image (full screen, visible and clear) */}
-      <img
-        src="/success-bg.jpg"
-        alt="Relaxing spa background"
-        className="absolute inset-0 w-full h-full object-cover"
-      />
-
-      {/* ✅ Soft glass-card in the center */}
-      <div className="relative bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-12 text-center max-w-2xl w-full animate-fade-in">
-        <div className="w-20 h-20 bg-gradient-to-br from-[#EAC7C7] to-[#C9A9A6] rounded-full flex items-center justify-center mx-auto mb-6">
-          <Sparkles className="w-10 h-10 text-white" />
-        </div>
-
-        <h2 className="text-4xl font-bold text-[#C9A9A6] mb-4">
-          Thank you, {formData.name}!
-        </h2>
-
-        <p className="text-lg text-gray-600 leading-relaxed">
-          You'll receive a WhatsApp message shortly confirming your booking.
-          We can't wait to pamper you!
-        </p>
-
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 relative">
         <img
-          src="/thankyou-flowers.png"
-          alt="Decorative flowers"
-          className="mx-auto mt-8 w-40 h-auto opacity-80"
+          src="/success-bg.jpg"
+          alt="Relaxing spa background"
+          className="absolute inset-0 w-full h-full object-cover"
         />
-
-        <button
-          onClick={() => {
-            setIsSuccess(false);
-            setFormData({
-              name: '',
-              whatsapp: '',
-              email: '',
-              service_type: '',
-              preferred_date: '',
-              preferred_time: '',
-              notes: ''
-            });
-          }}
-          className="mt-8 px-8 py-4 bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-        >
-          Book Another Session
-        </button>
+        <div className="relative bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-12 text-center max-w-2xl w-full animate-fade-in">
+          <div className="w-20 h-20 bg-gradient-to-br from-[#EAC7C7] to-[#C9A9A6] rounded-full flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-10 h-10 text-white" />
+          </div>
+          <h2 className="text-4xl font-bold text-[#C9A9A6] mb-4">
+            Thank you, {formData.name}!
+          </h2>
+          <p className="text-lg text-gray-600 leading-relaxed">
+            You'll receive a WhatsApp message shortly confirming your booking.
+            We can't wait to pamper you!
+          </p>
+          <img
+            src="/thankyou-flowers.png"
+            alt="Decorative flowers"
+            className="mx-auto mt-8 w-40 h-auto opacity-80"
+          />
+          <button
+            onClick={() => {
+              setIsSuccess(false);
+              setFormData({
+                name: '',
+                whatsapp: '',
+                email: '',
+                service_type: '',
+                preferred_date: '',
+                preferred_time: '',
+                notes: ''
+              });
+            }}
+            className="mt-8 px-8 py-4 bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+          >
+            Book Another Session
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   // ✅ MAIN BOOKING FORM
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#FFF8F0] via-[#EAC7C7]/20 to-[#FFF8F0]">
       {/* ✅ HERO SECTION */}
       <div className="relative overflow-hidden bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] py-20 px-4">
-        {/* ✅ Background Hero Image */}
         <img
           src="/about-intro.jpg"
           alt="Spa booking background"
           className="absolute inset-0 w-full h-full object-cover opacity-90"
         />
-
         <div className="absolute inset-0 bg-black/30"></div>
-
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <Flower2 className="w-16 h-16 text-white mx-auto mb-6 animate-pulse" />
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
@@ -165,12 +147,7 @@ if (isSuccess) {
       {/* ✅ FORM SECTION */}
       <div className="max-w-4xl mx-auto px-4 -mt-12 pb-20">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-          {/* ✅ Decorative Header Image */}
-          <img
-            src="/form-top-banner.jpg"
-            alt="Spa interior decor"
-            className="w-full h-48 object-cover"
-          />
+          {/* 🩷 Removed the old top banner here */}
 
           <div className="p-8 md:p-12">
             <p className="text-center text-gray-600 text-lg leading-relaxed mb-10">
@@ -295,14 +272,28 @@ if (isSuccess) {
                 {isSubmitting ? 'Submitting...' : 'Confirm My Booking 💗'}
               </button>
             </form>
-            {/* FOOTER — compact for mobile */}
-        <footer className="mt-8 text-center text-xs sm:text-sm text-gray-600">
-          <div className="inline-block px-4 py-3 bg-[#FFF8F0] rounded-xl shadow-inner">
-            <p className="leading-tight">LunaBloom Spa, East Legon, Accra</p>
-            <p className="leading-tight mt-1">+233 501 234 567 • hello@lunabloomspa.com</p>
-            <p className="mt-2 text-[11px] text-gray-500">© {new Date().getFullYear()} LunaBloom Spa</p>
-          </div>
-        </footer>
+
+            {/* ✅ FOOTER INFO */}
+            <footer className="mt-8 text-center text-xs sm:text-sm text-gray-600">
+              <div className="inline-block px-4 py-3 bg-[#FFF8F0] rounded-xl shadow-inner">
+                <p className="leading-tight">LunaBloom Spa, East Legon, Accra</p>
+                <p className="leading-tight mt-1">
+                  +233 501 234 567 • hello@lunabloomspa.com
+                </p>
+                <p className="mt-2 text-[11px] text-gray-500">
+                  © {new Date().getFullYear()} LunaBloom Spa
+                </p>
+              </div>
+            </footer>
+
+            {/* ✅ NEW FOOTER BANNER IMAGE (full width) */}
+            <div className="mt-12">
+              <img
+                src="/form-top-banner.jpg"
+                alt="Spa interior footer banner"
+                className="w-full h-56 md:h-72 object-cover rounded-t-3xl"
+              />
+            </div>
           </div>
         </div>
       </div>
