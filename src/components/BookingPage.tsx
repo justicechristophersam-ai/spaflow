@@ -134,7 +134,6 @@ export default function BookingPage() {
         />
         <div className="absolute inset-0 bg-black/30"></div>
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <Flower2 className="w-16 h-16 text-white mx-auto mb-6 animate-pulse" />
           <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
             Your calm begins here
           </h1>
