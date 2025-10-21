@@ -17,7 +17,8 @@ export default function Navigation({ currentPage, onNavigate }: NavigationProps)
             className="flex items-center space-x-2 focus:outline-none group"
           >
             <Flower2 className="w-8 h-8 sm:w-10 sm:h-10 text-[#C9A9A6] transition-transform duration-200 group-hover:scale-110" />
-            
+            <span className="text-xl sm:text-2xl font-semibold text-gray-800 group-hover:text-[#C9A9A6]">
+              
             </span>
           </button>
 
