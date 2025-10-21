@@ -36,7 +36,7 @@ export default function AboutPage({ onNavigate }: AboutPageProps) {
           </h1>
 
           <p className="mt-2 text-sm sm:text-base text-white/90 max-w-xl mx-auto">
-            A sanctuary where relaxation meets self-care — rooted in Ghanaian warmth and floral
+            A sanctuary where relaxation meets self-care, rooted in Ghanaian warmth and floral
             serenity.
           </p>
         </div>
