@@ -1,53 +1,42 @@
 import AdminDashboard from './admin/AdminDashboard';
+import AdminLogin from './admin/AdminLogin';
 import { useIsAdmin } from './hooks/useIsAdmin';
 import { supabase } from './lib/supabase';
 import { useEffect, useState } from 'react';
 
 export default function AdminApp() {
-  const { loading, isAdmin, userEmail } = useIsAdmin();
+  const { loading, isAdmin } = useIsAdmin();
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+      setUser(data.user ?? null);
       setAuthChecked(true);
     });
   }, []);
 
   if (!authChecked) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-gray-600">
-        Checking session…
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center text-gray-600">Checking session…</div>;
   }
 
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center text-gray-700">
-        <p className="text-lg font-semibold mb-3">Please sign in</p>
-        <p>You must be logged in to access the admin dashboard.</p>
-      </div>
-    );
-  }
+  // Not signed in? Show login screen.
+  if (!user) return <AdminLogin />;
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen text-gray-600">
-        Checking admin access…
-      </div>
-    );
-  }
+  // Signed in but still checking admin flag
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-600">Checking admin access…</div>;
 
+  // Signed in but not admin
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-center text-gray-700">
-        <p className="text-lg font-semibold mb-3">Unauthorized</p>
+      <div className="min-h-screen flex flex-col items-center justify-center text-center text-gray-700 px-6">
+        <p className="text-lg font-semibold mb-2">Unauthorized</p>
         <p>This dashboard is restricted to admin users only.</p>
+        <p className="text-sm mt-4 text-gray-500">Ask an existing admin to add your account to the admin list.</p>
       </div>
     );
   }
 
+  // Good to go
   return <AdminDashboard />;
 }
