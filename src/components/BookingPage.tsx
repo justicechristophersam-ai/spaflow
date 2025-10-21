@@ -118,16 +118,14 @@ export default function BookingPage() {
       // 1) All possible slots for this date/service
       const allSlots = generateSlotsForDate(preferred_date, serviceDuration, 0, 120);
 
-      // 2) Fetch already booked times (pending + confirmed)
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('preferred_time, status')
-        .eq('preferred_date', preferred_date)
-        .eq('service_type', service_type)
-        .in('status', ['pending', 'confirmed']);
+      // 2) Fetch already booked times via SECURE RPC
+      const { data, error } = await supabase.rpc('get_booked_slots', {
+        d: preferred_date,
+        s: service_type
+      });
 
       if (error) {
-        console.error('Error loading booked slots', error);
+        console.error('Error loading booked slots (RPC)', error);
         setBookedTimes([]);
         setAvailableTimes(allSlots);
         return;
@@ -156,24 +154,25 @@ export default function BookingPage() {
     setIsSubmitting(true);
 
     try {
-      // Re-check the slot right before insert (race-condition safe)
-      const { data: clash, error: clashErr } = await supabase
-        .from('bookings')
-        .select('id', { count: 'exact', head: true })
-        .eq('service_type', formData.service_type)
-        .eq('preferred_date', formData.preferred_date)
-        .eq('preferred_time', formData.preferred_time)
-        .in('status', ['pending', 'confirmed']);
-
-      if (clashErr) {
-        console.error('Availability re-check failed:', clashErr);
-      } else if ((clash as any)?.length > 0) {
-        alert('Sorry, that slot was just taken. Please choose another time.');
-        setIsSubmitting(false);
-        return;
+      // Re-check the slot right before insert using the same RPC
+      const { data: latest, error: rpcErr } = await supabase.rpc('get_booked_slots', {
+        d: formData.preferred_date,
+        s: formData.service_type
+      });
+      if (rpcErr) {
+        console.error('Availability re-check RPC failed:', rpcErr);
+      } else {
+        const justTaken = (latest ?? [])
+          .map((r: any) => String(r.preferred_time).slice(0, 5))
+          .includes(formData.preferred_time);
+        if (justTaken) {
+          alert('Sorry, that slot was just taken. Please choose another time.');
+          setIsSubmitting(false);
+          return;
+        }
       }
 
-      // Proceed with insert (status defaults to 'pending' in DB)
+      // Proceed with insert (status defaults to 'pending' in DB; unique index is final guard)
       const { error } = await supabase.from('bookings').insert([
         {
           name: formData.name,
@@ -292,8 +291,6 @@ export default function BookingPage() {
       {/* ✅ FORM SECTION */}
       <div className="max-w-4xl mx-auto px-4 mt-6 md:-mt-12 pb-20 relative z-10">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
-          {/* 🩷 Removed the old top banner here */}
-
           <div className="p-8 md:p-12">
             <p className="text-center text-gray-600 text-lg leading-relaxed mb-10">
               We offer tailored spa treatments designed to help you feel your best inside and out.
@@ -389,7 +386,7 @@ export default function BookingPage() {
                     Preferred Time
                   </label>
 
-                  {/* Replaces <input type="time"> with a select bound to availableTimes */}
+                  {/* Time select fed by availableTimes from secure RPC */}
                   <select
                     required
                     value={formData.preferred_time}
