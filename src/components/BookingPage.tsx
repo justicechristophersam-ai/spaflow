@@ -85,56 +85,57 @@ export default function BookingPage() {
   // ✅ SUCCESS SCREEN
 if (isSuccess) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFF8F0] py-12 px-4">
-      <div className="relative w-full max-w-2xl mx-auto text-center">
-        {/* ✅ Background Image for Success Section */}
+    <div className="min-h-screen flex flex-col items-center justify-center py-12 px-4 relative">
+      {/* ✅ Background Image (full screen, visible and clear) */}
+      <img
+        src="/success-bg.jpg"
+        alt="Relaxing spa background"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+
+      {/* ✅ Soft glass-card in the center */}
+      <div className="relative bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-12 text-center max-w-2xl w-full animate-fade-in">
+        <div className="w-20 h-20 bg-gradient-to-br from-[#EAC7C7] to-[#C9A9A6] rounded-full flex items-center justify-center mx-auto mb-6">
+          <Sparkles className="w-10 h-10 text-white" />
+        </div>
+
+        <h2 className="text-4xl font-bold text-[#C9A9A6] mb-4">
+          Thank you, {formData.name}!
+        </h2>
+
+        <p className="text-lg text-gray-600 leading-relaxed">
+          You'll receive a WhatsApp message shortly confirming your booking.
+          We can't wait to pamper you!
+        </p>
+
         <img
-          src="/success-bg.jpg"
-          alt="Relaxing spa background"
-          className="absolute inset-0 w-full h-full object-cover rounded-3xl opacity-20"
+          src="/thankyou-flowers.png"
+          alt="Decorative flowers"
+          className="mx-auto mt-8 w-40 h-auto opacity-80"
         />
 
-        <div className="relative bg-white/90 backdrop-blur-md rounded-3xl shadow-xl p-12 animate-fade-in">
-          <div className="w-20 h-20 bg-gradient-to-br from-[#EAC7C7] to-[#C9A9A6] rounded-full flex items-center justify-center mx-auto mb-6">
-            <Sparkles className="w-10 h-10 text-white" />
-          </div>
-          <h2 className="text-4xl font-bold text-[#C9A9A6] mb-4">
-            Thank you, {formData.name}!
-          </h2>
-          <p className="text-lg text-gray-600 leading-relaxed">
-            You'll receive a WhatsApp message shortly confirming your booking.
-            We can't wait to pamper you!
-          </p>
-
-          {/* ✅ Decorative Image */}
-          <img
-            src="/thankyou-flowers.png"
-            alt="Decorative flowers"
-            className="mx-auto mt-8 w-40 h-auto opacity-80"
-          />
-
-          <button
-            onClick={() => {
-              setIsSuccess(false);
-              setFormData({
-                name: '',
-                whatsapp: '',
-                email: '',
-                service_type: '',
-                preferred_date: '',
-                preferred_time: '',
-                notes: ''
-              });
-            }}
-            className="mt-8 px-8 py-4 bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
-          >
-            Book Another Session
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setIsSuccess(false);
+            setFormData({
+              name: '',
+              whatsapp: '',
+              email: '',
+              service_type: '',
+              preferred_date: '',
+              preferred_time: '',
+              notes: ''
+            });
+          }}
+          className="mt-8 px-8 py-4 bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white font-medium rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+        >
+          Book Another Session
+        </button>
       </div>
     </div>
   );
 }
+
 
   // ✅ MAIN BOOKING FORM
   return (
