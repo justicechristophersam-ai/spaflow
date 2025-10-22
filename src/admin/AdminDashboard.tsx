@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { useIsAdmin } from '../hooks/useIsAdmin';
 import {
   CalendarRange, CheckCircle2, Clock, Database, Download, Filter,
   Loader2, Search, Users, XCircle
@@ -36,95 +35,106 @@ function startOfWeek(d = new Date()) {
   return date;
 }
 
-export default function AdminDashboard() {
-  const { loading: gateLoading, isAdmin, userEmail } = useIsAdmin();
-
+export default function AdminDashboard({
+  token,
+  onLogout,
+  adminName,
+}: {
+  token: string;                 // ← required: session token from admin_login
+  onLogout: () => void;          // ← required: clears local storage in AdminApp
+  adminName?: string | null;     // ← optional: show who is signed in
+}) {
   const [loading, setLoading] = useState(true);
+
+  // Filters
   const [q, setQ] = useState('');
   const [service, setService] = useState<string>('');
   const [status, setStatus] = useState<string>('');
   const [from, setFrom] = useState<string>(() => toISO(startOfWeek(new Date())));
   const [to, setTo] = useState<string>(() => toISO(new Date()));
 
+  // Data
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [counts, setCounts] = useState({
     total: 0, pending: 0, confirmed: 0, cancelled: 0, today: 0, this_week: 0,
   });
 
+  // Pagination (client-side)
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
+  // Fetch list + counts using secure RPCs with p_token
   useEffect(() => {
-    if (gateLoading || !isAdmin) return;
-
+    if (!token) return;
     let cancelled = false;
 
     async function fetchAll() {
       setLoading(true);
 
-      const query = supabase
-        .from('bookings')
-        .select('*')
-        .gte('preferred_date', from)
-        .lte('preferred_date', to)
-        .order('preferred_date', { ascending: true })
-        .order('preferred_time', { ascending: true });
-
-      if (service) query.eq('service_type', service);
-      if (status)  query.eq('status', status);
-
       const [{ data, error }, { data: stats, error: statsErr }] = await Promise.all([
-        query,
-        supabase.rpc('get_booking_counts', { d_from: from, d_to: to })
+        supabase.rpc('list_bookings_admin', {
+          p_token: token,
+          d_from: from,
+          d_to: to,
+          p_service: service || null,
+          p_status: status || null,
+        }),
+        supabase.rpc('get_booking_counts_admin', {
+          p_token: token,
+          d_from: from,
+          d_to: to,
+        }),
       ]);
 
-      if (!cancelled) {
-        if (error) console.error('List error:', error);
-        if (statsErr) console.error('Stats error:', statsErr);
+      if (cancelled) return;
 
-        const safeRows = (data ?? []).map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          whatsapp: r.whatsapp,
-          email: r.email,
-          service_type: r.service_type,
-          preferred_date: r.preferred_date,
-          preferred_time: String(r.preferred_time).slice(0, 5),
-          status: r.status,
-          created_at: r.created_at,
-          notes: r.notes ?? ''
-        })) as BookingRow[];
+      if (error) console.error('List RPC error:', error);
+      if (statsErr) console.error('Stats RPC error:', statsErr);
 
-        const needle = q.trim().toLowerCase();
-        const filtered = needle
-          ? safeRows.filter(r =>
-              r.name.toLowerCase().includes(needle) ||
-              r.whatsapp.toLowerCase().includes(needle) ||
-              r.email.toLowerCase().includes(needle) ||
-              r.notes?.toLowerCase().includes(needle)
-            )
-          : safeRows;
+      // Normalize & client-side search
+      const safeRows = (data ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        whatsapp: r.whatsapp,
+        email: r.email,
+        service_type: r.service_type,
+        preferred_date: r.preferred_date,
+        preferred_time: String(r.preferred_time).slice(0, 5),
+        status: r.status,
+        created_at: r.created_at,
+        notes: r.notes ?? ''
+      })) as BookingRow[];
 
-        setRows(filtered);
+      const needle = q.trim().toLowerCase();
+      const filtered = needle
+        ? safeRows.filter(r =>
+            r.name.toLowerCase().includes(needle) ||
+            r.whatsapp.toLowerCase().includes(needle) ||
+            r.email.toLowerCase().includes(needle) ||
+            r.notes?.toLowerCase().includes(needle)
+          )
+        : safeRows;
 
-        if (stats && stats.length > 0) {
-          const s = stats[0] as any;
-          setCounts({
-            total: Number(s.total ?? 0),
-            pending: Number(s.pending ?? 0),
-            confirmed: Number(s.confirmed ?? 0),
-            cancelled: Number(s.cancelled ?? 0),
-            today: Number(s.today ?? 0),
-            this_week: Number(s.this_week ?? 0),
-          });
-        }
+      setRows(filtered);
 
-        setLoading(false);
+      if (stats && stats.length > 0) {
+        const s = stats[0] as any;
+        setCounts({
+          total: Number(s.total ?? 0),
+          pending: Number(s.pending ?? 0),
+          confirmed: Number(s.confirmed ?? 0),
+          cancelled: Number(s.cancelled ?? 0),
+          today: Number(s.today ?? 0),
+          this_week: Number(s.this_week ?? 0),
+        });
       }
+
+      setLoading(false);
     }
 
     fetchAll();
 
+    // Optional: realtime refresh if any booking changes
     const channel = supabase
       .channel('bookings-admin')
       .on('postgres_changes',
@@ -137,24 +147,35 @@ export default function AdminDashboard() {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [gateLoading, isAdmin, q, service, status, from, to]);
+  }, [token, q, service, status, from, to]);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(rows.length / pageSize)), [rows.length]);
-  const pageRows = useMemo(() => rows.slice((page - 1) * pageSize, page * pageSize), [rows, page]);
+  const pageRows  = useMemo(() => rows.slice((page - 1) * pageSize, page * pageSize), [rows, page]);
 
   async function updateStatus(id: string, newStatus: BookingRow['status']) {
     const prev = rows.slice();
     setRows(rs => rs.map(r => (r.id === id ? { ...r, status: newStatus } : r)));
 
-    const { error } = await supabase
-      .from('bookings')
-      .update({ status: newStatus })
-      .eq('id', id);
+    const { error } = await supabase.rpc('update_booking_status_admin', {
+      p_token: token,
+      p_id: id,
+      p_new_status: newStatus,
+    });
 
     if (error) {
-      console.error('Update status failed:', error);
+      console.error('Update status RPC failed:', error);
       setRows(prev);
-      alert('Could not update status. Are you an admin?');
+      alert('Could not update status. Check admin access.');
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await supabase.rpc('admin_logout', { p_token: token });
+    } catch (e) {
+      // ignore; we'll still clear local storage client-side
+    } finally {
+      onLogout();
     }
   }
 
@@ -179,23 +200,6 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   }
 
-  if (gateLoading) {
-    return (
-      <div className="p-8 flex items-center gap-3 text-gray-600">
-        <Loader2 className="w-5 h-5 animate-spin" />
-        Checking admin access…
-      </div>
-    );
-  }
-  if (!isAdmin) {
-    return (
-      <div className="p-8 text-gray-700">
-        <p className="text-lg font-semibold mb-2">Unauthorized</p>
-        <p>This page is for admins only. Please sign in with an admin account.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
@@ -203,28 +207,24 @@ export default function AdminDashboard() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-neutral-900">LunaBloom — Admin Dashboard</h1>
-            <p className="text-sm text-neutral-500">Signed in as {userEmail}</p>
+            {adminName ? (
+              <p className="text-sm text-neutral-500">Signed in as {adminName}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
-            // Inside AdminDashboard component — maybe in your header bar
-export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  return (
-    <div className="min-h-screen bg-[#FFF8F0] p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">LunaBloom Admin Dashboard</h1>
-        <button
-          onClick={onLogout}
-          className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-700"
-        >
-          Log Out
-        </button>
-      </div>
             <button
               onClick={downloadCSV}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800"
             >
               <Download className="w-4 h-4" />
               Export CSV
+            </button>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border"
+              title="Sign out"
+            >
+              Log Out
             </button>
           </div>
         </div>
