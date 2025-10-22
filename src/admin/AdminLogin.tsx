@@ -18,14 +18,20 @@ export default function AdminLogin({
     setLoading(true);
     try {
       const { data, error } = await supabase.rpc('admin_login', {
-        p_username: username,
-        p_password: password,
-      });
-      if (error) {
-        console.error('admin_login RPC error:', error);
-        setError('Login failed. Please try again.');
-        return;
-      }
+  p_username: username,
+  p_password: password,
+});
+
+if (error) {
+  console.error('admin_login RPC error:', {
+    code: (error as any).code,
+    message: error.message,
+    details: (error as any).details,
+    hint: (error as any).hint,
+  });
+  setError(`Login failed: ${error.message}`);
+  return;
+}
       if (!data) {
         setError('Invalid username or password.');
         return;
