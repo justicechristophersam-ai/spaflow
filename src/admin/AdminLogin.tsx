@@ -20,7 +20,7 @@ export default function AdminLogin({
       // ✅ Use RPC — param names MUST match function args
       const { data, error } = await supabase.rpc('admin_login', {
         p_username: username,
-        p_password: password,
+        p_password: password
       });
 
       if (error) {
