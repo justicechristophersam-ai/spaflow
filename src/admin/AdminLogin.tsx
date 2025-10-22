@@ -17,6 +17,8 @@ export default function AdminLogin({
     setError(null);
     setLoading(true);
     try {
+      console.log('Supabase REST URL:', (supabase as any).rest?.url || 'n/a');
+console.log('Trying login with:', { p_username: username, p_password: '********' });
       const { data, error } = await supabase.rpc('admin_login', {
   p_username: username,
   p_password: password,
