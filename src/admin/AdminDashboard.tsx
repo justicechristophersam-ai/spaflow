@@ -206,6 +206,19 @@ export default function AdminDashboard() {
             <p className="text-sm text-neutral-500">Signed in as {userEmail}</p>
           </div>
           <div className="flex items-center gap-2">
+            // Inside AdminDashboard component — maybe in your header bar
+export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="min-h-screen bg-[#FFF8F0] p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">LunaBloom Admin Dashboard</h1>
+        <button
+          onClick={onLogout}
+          className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm hover:bg-gray-700"
+        >
+          Log Out
+        </button>
+      </div>
             <button
               onClick={downloadCSV}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800"
