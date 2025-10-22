@@ -33,5 +33,11 @@ export default function AdminApp() {
     return <AdminLogin onLogin={handleLogin} />;
   }
 
-  return <AdminDashboard onLogout={handleLogout} />;
+  return (
+    <AdminDashboard
+      token={adminUser.token}
+      onLogout={handleLogout}
+      adminName={adminUser.username}
+    />
+  );
 }
