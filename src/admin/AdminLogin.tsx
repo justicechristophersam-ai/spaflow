@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-export default function AdminLogin({ onLogin }: { onLogin: (user: { token: string; username: string }) => void }) {
+export default function AdminLogin({
+  onLogin,
+}: {
+  onLogin: (user: { token: string; username: string }) => void;
+}) {
   const [username, setUsername] = useState('');
-  const [password, setPassword]   = useState('');
-  const [error, setError]         = useState<string | null>(null);
-  const [loading, setLoading]     = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError]       = useState<string | null>(null);
+  const [loading, setLoading]   = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -13,10 +17,10 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: { token: strin
     setLoading(true);
 
     try {
-      // ✅ Use the secure RPC (NOT a table select)
+      // ✅ Use RPC — param names MUST match function args
       const { data, error } = await supabase.rpc('admin_login', {
-        p_username: username,   // param names must match the SQL
-        p_password: password
+        p_username: username,
+        p_password: password,
       });
 
       if (error) {
@@ -25,13 +29,12 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: { token: strin
         return;
       }
       if (!data) {
-        // data is null when username/password don’t match
         setError('Invalid username or password.');
         return;
       }
 
-      // data is the session token (uuid)
-      onLogin({ token: data as string, username });
+      // data is a UUID token
+      onLogin({ token: String(data), username });
     } catch (err) {
       console.error(err);
       setError('Login failed. Please try again.');
