@@ -313,6 +313,11 @@ $$;
 REVOKE ALL ON FUNCTION public.slot_taken(date, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.slot_taken(date, text, text) TO anon;
 
--- 6) One-time: seed your own admin account (pick a username/password)
---    You can run this once, then comment/remove it.
--- SELECT public.admin_create('admin', 'spa123');  -- change me!
+-- 6) Seed or reset the admin account to your chosen credentials
+-- Username: bigsamcreates
+-- Password: bigsamadmin
+INSERT INTO public.admin_logins (username, password_hash)
+VALUES ('bigsamcreates', crypt('bigsamadmin', gen_salt('bf')))
+ON CONFLICT (username)
+DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
