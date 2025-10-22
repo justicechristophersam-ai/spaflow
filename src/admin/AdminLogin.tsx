@@ -8,28 +8,36 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: any) => void }
   const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  e.preventDefault();
+  setError(null);
+  setLoading(true);
 
-    try {
-      const { data, error } = await supabase.rpc('admin_login', {
-        p_username: username,
-        p_password: password,
-      });
+  try {
+    const { data, error } = await supabase.rpc('admin_login', {
+      p_username: username,
+      p_password: password,
+    });
 
-      if (error) throw error;
-      if (!data) {
-        setError('Invalid username or password');
-      } else {
-        localStorage.setItem('adminUser', JSON.stringify({ token: data, username }));
-        onLogin({ token: data, username });
-      }
-    } catch (err: any) {
-      console.error('Login failed:', err);
-      setError('Login failed. Try again.');
-    } finally {
-      setLoading(false);
+    if (error) throw error;
+
+    // admin_login returns a row: [{ token: uuid, admin_name: text }]
+    const row = Array.isArray(data) ? data[0] : data;
+
+    if (!row || !row.token) {
+      setError('Invalid username or password');
+      return;
+    }
+
+    const adminUser = { token: String(row.token), username, adminName: row.admin_name ?? 'Admin' };
+    localStorage.setItem('adminUser', JSON.stringify(adminUser));
+
+    onLogin(adminUser);
+  } catch (err: any) {
+    console.error('Login failed:', err);
+    // Show DB hint if available; otherwise a friendly message
+    setError(err?.message || 'Login failed. Try again.');
+  } finally {
+    setLoading(false);
     }
   }
 
