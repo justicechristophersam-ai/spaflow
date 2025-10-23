@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate OG Image</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #1a1a1a;
+      font-family: 'Poppins', sans-serif;
+    }
+    #canvas-container {
+      margin: 20px auto;
+      text-align: center;
+    }
+    canvas {
+      border: 2px solid #fff;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    button {
+      margin: 20px 10px;
+      padding: 12px 24px;
+      font-size: 16px;
+      background: #D4A574;
+      color: #2C1810;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover {
+      background: #C9934A;
+    }
+    .info {
+      color: #fff;
+      text-align: center;
+      margin: 20px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="info">
+    <h2>LunaBloom Spa - Social Media Preview Image Generator</h2>
+    <p>Click "Download Image" to save the preview image for social media sharing</p>
+  </div>
+
+  <div id="canvas-container">
+    <canvas id="ogCanvas" width="1200" height="630"></canvas>
+  </div>
+
+  <div style="text-align: center;">
+    <button onclick="downloadImage()">Download Image (share-preview.jpg)</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('ogCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawOGImage() {
+      const gradient = ctx.createLinearGradient(0, 0, 1200, 630);
+      gradient.addColorStop(0, '#FFF8F0');
+      gradient.addColorStop(1, '#F5E6D3');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 1200, 630);
+
+      ctx.fillStyle = 'rgba(232, 212, 184, 0.3)';
+      ctx.beginPath();
+      ctx.arc(100, 80, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(212, 165, 116, 0.2)';
+      ctx.beginPath();
+      ctx.arc(1100, 100, 100, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(201, 147, 74, 0.15)';
+      ctx.beginPath();
+      ctx.arc(200, 550, 80, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(232, 212, 184, 0.25)';
+      ctx.beginPath();
+      ctx.arc(1050, 530, 90, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawLotus(80, 250, 0.4);
+      drawLotus(1060, 400, 0.4);
+
+      const accentGradient = ctx.createLinearGradient(300, 280, 900, 280);
+      accentGradient.addColorStop(0, 'rgba(212, 165, 116, 0.3)');
+      accentGradient.addColorStop(0.5, 'rgba(201, 147, 74, 0.5)');
+      accentGradient.addColorStop(1, 'rgba(212, 165, 116, 0.3)');
+      ctx.fillStyle = accentGradient;
+      ctx.fillRect(300, 280, 600, 3);
+
+      ctx.fillStyle = '#2C1810';
+      ctx.font = 'bold 90px "Playfair Display", serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.letterSpacing = '2px';
+      ctx.fillText('LunaBloom', 600, 240);
+
+      ctx.fillStyle = '#6B5D52';
+      ctx.font = '300 36px "Poppins", sans-serif';
+      ctx.letterSpacing = '4px';
+      ctx.fillText('WHERE CALM MEETS CLASS', 600, 340);
+
+      ctx.fillStyle = '#8B7D72';
+      ctx.font = '400 28px "Poppins", sans-serif';
+      ctx.letterSpacing = '1px';
+      ctx.fillText('Experience Serene Luxury • Book Your Spa Session Today', 600, 420);
+
+      ctx.strokeStyle = 'rgba(212, 165, 116, 0.3)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(20, 20, 1160, 590);
+    }
+
+    function drawLotus(x, y, opacity) {
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.fillStyle = '#D4A574';
+
+      ctx.beginPath();
+      ctx.moveTo(x, y + 30);
+      ctx.quadraticCurveTo(x + 15, y, x + 30, y + 30);
+      ctx.quadraticCurveTo(x + 15, y + 20, x, y + 30);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(x + 30, y + 30);
+      ctx.quadraticCurveTo(x + 45, y, x + 60, y + 30);
+      ctx.quadraticCurveTo(x + 45, y + 20, x + 30, y + 30);
+      ctx.fill();
+
+      ctx.fillStyle = '#C9934A';
+      ctx.beginPath();
+      ctx.moveTo(x + 15, y + 30);
+      ctx.quadraticCurveTo(x + 30, y + 10, x + 45, y + 30);
+      ctx.quadraticCurveTo(x + 30, y + 25, x + 15, y + 30);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = 'share-preview.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 0.9);
+      link.click();
+    }
+
+    window.addEventListener('load', () => {
+      setTimeout(drawOGImage, 100);
+    });
+  </script>
+</body>
+</html>
