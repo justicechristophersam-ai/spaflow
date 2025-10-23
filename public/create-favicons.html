@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head><title>Favicon Generator</title></head>
+<body style="margin: 20px; font-family: sans-serif;">
+    <h2>LunaBloom Spa Favicon Generator</h2>
+    <p>Click the buttons below to download each favicon file:</p>
+    
+    <div id="downloads"></div>
+    
+    <script>
+        function createFavicon(size, filename) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            // Background - brand color
+            ctx.fillStyle = '#C9A9A6';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Draw simplified flower icon in white
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = size / 16;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            const center = size / 2;
+            const radius = size / 4;
+            
+            // Draw 4 petals
+            ctx.beginPath();
+            // Top petal
+            ctx.arc(center, center - radius * 0.6, radius * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Right petal
+            ctx.beginPath();
+            ctx.arc(center + radius * 0.6, center, radius * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Bottom petal
+            ctx.beginPath();
+            ctx.arc(center, center + radius * 0.6, radius * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Left petal
+            ctx.beginPath();
+            ctx.arc(center - radius * 0.6, center, radius * 0.5, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(center, center, radius * 0.3, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            
+            // Download
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.textContent = `Download ${filename}`;
+                a.style.display = 'block';
+                a.style.marginBottom = '10px';
+                a.style.padding = '10px';
+                a.style.background = '#C9A9A6';
+                a.style.color = 'white';
+                a.style.textDecoration = 'none';
+                a.style.borderRadius = '5px';
+                a.style.width = '200px';
+                document.getElementById('downloads').appendChild(a);
+            });
+        }
+        
+        // Generate all sizes
+        createFavicon(16, 'favicon-16.png');
+        createFavicon(32, 'favicon-32.png');
+        createFavicon(180, 'apple-touch-icon.png');
+        createFavicon(512, 'favicon-512.png');
+        
+        document.body.innerHTML += '<p style="margin-top: 30px; color: #666;">After downloading, place these files in your /public folder.</p>';
+    </script>
+</body>
+</html>
