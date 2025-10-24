@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   CalendarRange, CheckCircle2, Clock, Database, Download, Filter,
-  Loader2, Search, Users, XCircle
+  Loader2, Search, Users, XCircle, RefreshCw
 } from 'lucide-react';
 
 type BookingRow = {
@@ -28,12 +28,37 @@ const SERVICES = [
 ];
 
 function toISO(d: Date) { return d.toISOString().slice(0, 10); }
+function addDays(d: Date, n: number) { return new Date(d.getTime() + n * 86400000); }
 function startOfWeek(d = new Date()) {
   const date = new Date(d);
   const day = (date.getDay() + 6) % 7; // Monday=0
   date.setDate(date.getDate() - day);
   date.setHours(0,0,0,0);
   return date;
+}
+
+// ---- Chips UX ----
+type ChipKey = 'upcoming' | 'today' | 'week' | 'last30' | 'all' | 'custom';
+
+function rangeForChip(c: ChipKey) {
+  const today = new Date();
+  switch (c) {
+    case 'upcoming':
+      return { from: toISO(today), to: toISO(addDays(today, 90)) };
+    case 'today':
+      return { from: toISO(today), to: toISO(today) };
+    case 'week': {
+      const ws = startOfWeek(today);
+      return { from: toISO(ws), to: toISO(addDays(ws, 6)) };
+    }
+    case 'last30':
+      return { from: toISO(addDays(today, -30)), to: toISO(today) };
+    case 'all':
+      return { from: null as string | null, to: null as string | null };
+    case 'custom':
+      // handled separately by the component's customFrom/customTo state
+      return { from: null as string | null, to: null as string | null };
+  }
 }
 
 export default function AdminDashboard({
@@ -45,43 +70,63 @@ export default function AdminDashboard({
   onLogout: () => void;
   adminName?: string | null;
 }) {
-  const [loading, setLoading] = useState(true);
+  // chips & filters
+  const [chip, setChip] = useState<ChipKey>('upcoming'); // DEFAULT = Upcoming (today → +90)
   const [q, setQ] = useState('');
   const [service, setService] = useState<string>('');
   const [status, setStatus] = useState<string>('');
-  const [from, setFrom] = useState<string>(() => toISO(startOfWeek(new Date())));
-  const [to, setTo]     = useState<string>(() => toISO(new Date()));
 
+  // custom date range (only used when chip === 'custom')
+  const [customFrom, setCustomFrom] = useState<string>(toISO(startOfWeek(new Date())));
+  const [customTo,   setCustomTo]   = useState<string>(toISO(new Date()));
+
+  // derived range to send to RPC
+  const derived = useMemo(() => {
+    if (chip === 'custom') {
+      return {
+        from: customFrom || null,
+        to:   customTo   || null,
+      };
+    }
+    return rangeForChip(chip);
+  }, [chip, customFrom, customTo]);
+
+  // data
   const [rows, setRows] = useState<BookingRow[]>([]);
   const [counts, setCounts] = useState({ total: 0, pending: 0, confirmed: 0, cancelled: 0, today: 0, this_week: 0 });
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    async function fetchAll() {
-      setLoading(true);
+  async function fetchAll(isRefresh = false) {
+    if (!token) return;
+    try {
+      setError(null);
+      isRefresh ? setRefreshing(true) : setLoading(true);
+
+      const d_from = derived.from ?? null;
+      const d_to   = derived.to   ?? null;
 
       const [{ data, error }, { data: stats, error: statsErr }] = await Promise.all([
         supabase.rpc('list_bookings_admin', {
           p_token: token,
-          d_from: from,
-          d_to: to,
+          d_from,
+          d_to,
           p_service: service || null,
           p_status: status || null,
         }),
         supabase.rpc('get_booking_counts_admin', {
           p_token: token,
-          d_from: from,
-          d_to: to,
+          d_from,
+          d_to,
         }),
       ]);
 
-      if (cancelled) return;
-      if (error) console.error('List RPC error:', error);
-      if (statsErr) console.error('Stats RPC error:', statsErr);
+      if (error) throw error;
+      if (statsErr) throw statsErr;
 
       const safeRows = (data ?? []).map((r: any) => ({
         id: r.id,
@@ -90,7 +135,7 @@ export default function AdminDashboard({
         email: r.email,
         service_type: r.service_type,
         preferred_date: r.preferred_date,
-        preferred_time: String(r.preferred_time).slice(0,5),
+        preferred_time: String(r.preferred_time ?? '').slice(0,5),
         status: r.status,
         created_at: r.created_at,
         notes: r.notes ?? ''
@@ -99,10 +144,11 @@ export default function AdminDashboard({
       const needle = q.trim().toLowerCase();
       const filtered = needle
         ? safeRows.filter(r =>
-            r.name.toLowerCase().includes(needle) ||
-            r.whatsapp.toLowerCase().includes(needle) ||
-            r.email.toLowerCase().includes(needle) ||
-            r.notes?.toLowerCase().includes(needle)
+            (r.name || '').toLowerCase().includes(needle) ||
+            (r.whatsapp || '').toLowerCase().includes(needle) ||
+            (r.email || '').toLowerCase().includes(needle) ||
+            (r.notes || '').toLowerCase().includes(needle) ||
+            (r.service_type || '').toLowerCase().includes(needle)
           )
         : safeRows;
 
@@ -119,25 +165,42 @@ export default function AdminDashboard({
           this_week: Number(s.this_week ?? 0),
         });
       }
-
+    } catch (e: any) {
+      console.error('Admin fetch error:', e);
+      setError(e.message || 'Failed to load bookings');
+    } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }
 
-    fetchAll();
+  useEffect(() => {
+    fetchAll(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, chip, service, status]); // q is client-side filter; dates are derived from chip
 
+  // refresh on realtime DB changes (simple strategy)
+  useEffect(() => {
     const channel = supabase
       .channel('bookings-admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => fetchAll(true))
       .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chip, service, status]);
 
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [token, q, service, status, from, to]);
+  // client-side search filter
+  const filteredRows = useMemo(() => {
+    if (!q) return rows;
+    const needle = q.toLowerCase();
+    return rows.filter((r) =>
+      [r.name, r.email, r.whatsapp, r.notes, r.service_type]
+        .some((x) => (x || '').toLowerCase().includes(needle))
+    );
+  }, [rows, q]);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(rows.length / pageSize)), [rows.length]);
-  const pageRows   = useMemo(() => rows.slice((page - 1) * pageSize, page * pageSize), [rows, page]);
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(filteredRows.length / pageSize)), [filteredRows.length]);
+  const pageRows   = useMemo(() => filteredRows.slice((page - 1) * pageSize, page * pageSize), [filteredRows, page]);
 
   async function updateStatus(id: string, newStatus: BookingRow['status']) {
     const prev = rows.slice();
@@ -159,10 +222,17 @@ export default function AdminDashboard({
     finally { onLogout(); }
   }
 
+  function currentRangeLabel() {
+    if (chip === 'all') return 'All time';
+    if (chip === 'custom') return `${customFrom || '—'} → ${customTo || '—'}`;
+    const { from, to } = rangeForChip(chip);
+    return `${from ?? '—'} → ${to ?? '—'}`;
+  }
+
   function downloadCSV() {
     const headers = ['id','name','whatsapp','email','service_type','preferred_date','preferred_time','status','created_at','notes'];
     const lines = [headers.join(',')];
-    rows.forEach(r => {
+    filteredRows.forEach(r => {
       const vals = [
         r.id, r.name, r.whatsapp, r.email, r.service_type,
         r.preferred_date, r.preferred_time, r.status, r.created_at,
@@ -170,12 +240,24 @@ export default function AdminDashboard({
       ];
       lines.push(vals.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(','));
     });
+    const label = chip === 'all' ? 'all_time'
+      : chip === 'custom' ? `${customFrom || 'na'}_to_${customTo || 'na'}`
+      : currentRangeLabel().replace(/\s|→/g,'');
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `bookings_${from}_to_${to}.csv`;
+    const a = document.createElement('a'); a.href = url; a.download = `bookings_${label}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+
+  const chips: { key: ChipKey; label: string }[] = [
+    { key: 'upcoming', label: 'Upcoming' },
+    { key: 'today',    label: 'Today' },
+    { key: 'week',     label: 'This Week' },
+    { key: 'last30',   label: 'Last 30 days' },
+    { key: 'all',      label: 'All time' },
+    { key: 'custom',   label: 'Custom' },
+  ];
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -185,8 +267,18 @@ export default function AdminDashboard({
           <div>
             <h1 className="text-2xl font-bold text-neutral-900">LunaBloom — Admin Dashboard</h1>
             {adminName ? <p className="text-sm text-neutral-500">Signed in as {adminName}</p> : null}
+            <p className="text-xs text-neutral-400 mt-1">Range: {currentRangeLabel()}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchAll(true)}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
             <button
               onClick={downloadCSV}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800"
@@ -208,6 +300,22 @@ export default function AdminDashboard({
       {/* Filters */}
       <div className="px-6 py-4 border-b bg-white">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-6 gap-3">
+          {/* Chips */}
+          <div className="md:col-span-3">
+            <div className="flex flex-wrap gap-2">
+              {chips.map(c => (
+                <button
+                  key={c.key}
+                  onClick={() => { setPage(1); setChip(c.key); }}
+                  className={`px-3 py-1.5 rounded-full border text-sm ${chip === c.key ? 'bg-black text-white' : 'bg-white'}`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Search */}
           <div className="md:col-span-2">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
@@ -220,17 +328,7 @@ export default function AdminDashboard({
             </div>
           </div>
 
-          <div>
-            <select
-              value={service}
-              onChange={(e) => { setPage(1); setService(e.target.value); }}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300"
-            >
-              <option value="">All services</option>
-              {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-
+          {/* Status */}
           <div>
             <select
               value={status}
@@ -244,16 +342,44 @@ export default function AdminDashboard({
             </select>
           </div>
 
-          <div className="flex gap-2">
-            <input type="date" value={from} onChange={(e) => { setPage(1); setFrom(e.target.value); }} className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300" aria-label="From" />
-            <input type="date" value={to}   onChange={(e) => { setPage(1); setTo(e.target.value); }}   className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300" aria-label="To" />
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 text-neutral-500">
-            <Filter className="w-4 h-4" />
-            Filters
+          {/* Service */}
+          <div>
+            <select
+              value={service}
+              onChange={(e) => { setPage(1); setService(e.target.value); }}
+              className="w-full px-3 py-2 rounded-lg border border-neutral-300"
+            >
+              <option value="">All services</option>
+              {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
         </div>
+
+        {/* Custom date range (only visible when chip === 'custom') */}
+        {chip === 'custom' && (
+          <div className="max-w-7xl mx-auto mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div className="md:col-span-2 flex gap-2">
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => { setPage(1); setCustomFrom(e.target.value); }}
+                className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300"
+                aria-label="From"
+              />
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => { setPage(1); setCustomTo(e.target.value); }}
+                className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300"
+                aria-label="To"
+              />
+            </div>
+            <div className="hidden md:flex items-center gap-2 text-neutral-500">
+              <Filter className="w-4 h-4" />
+              Custom range
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stat cards */}
@@ -342,7 +468,7 @@ export default function AdminDashboard({
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 border-t bg-neutral-50">
             <div className="text-xs text-neutral-500">
-              Page {page} of {totalPages} • {rows.length} row{rows.length === 1 ? '' : 's'}
+              Page {page} of {totalPages} • {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Prev</button>
