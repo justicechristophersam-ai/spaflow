@@ -328,7 +328,7 @@ export default function AdminDashboard({
       <div className="px-6 py-6 border-b bg-white sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900">LunaBloom — Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">Admin Dashboard</h1>
             {adminName ? <p className="text-sm text-neutral-500">Signed in as {adminName}</p> : null}
             <p className="text-xs text-neutral-400 mt-1">Range: {currentRangeLabel()}</p>
           </div>
