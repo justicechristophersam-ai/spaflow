@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import {
   CalendarRange, CheckCircle2, Clock, Database, Download, Filter,
   Loader2, Search, Users, XCircle, RefreshCw, Phone, MessageCircle, Copy, Plus,
-  Home as HomeIcon, CalendarDays, BarChart2, Settings as SettingsIcon, LogOut
+  Home as HomeIcon, CalendarDays, BarChart2, Settings as SettingsIcon, LogOut, Flower2
 } from 'lucide-react';
 
 type BookingRow = {
@@ -331,38 +331,50 @@ export default function AdminDashboard({
 
   // ---------- UI ----------
   return (
-    <div className="min-h-screen bg-neutral-50 relative">
+    <div className="min-h-screen bg-[#FFF8F0] relative">
       {/* Header */}
-      <div className="px-6 py-6 border-b bg-white sticky top-0 z-30">
+      <div className="px-6 py-6 border-b border-[#C9A9A6]/20 bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900">LunaBloom — Admin Dashboard</h1>
-            {adminName ? <p className="text-sm text-neutral-500">Signed in as {adminName}</p> : null}
-            <p className="text-xs text-neutral-400 mt-1">Range: {currentRangeLabel()}</p>
+          <div className="flex items-center gap-4">
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-2 group transition-transform duration-200 hover:scale-105"
+              title="Visit LunaBloom Spa"
+            >
+              <Flower2 className="w-8 h-8 text-[#C9A9A6] transition-transform duration-200 group-hover:rotate-12" />
+              <span className="text-xl font-semibold text-gray-800 group-hover:text-[#C9A9A6] transition-colors">LunaBloom</span>
+            </a>
+            <div className="border-l border-gray-300 pl-4 ml-2">
+              <h1 className="text-lg font-medium text-gray-700">Admin Dashboard</h1>
+              {adminName ? <p className="text-xs text-gray-500">Signed in as {adminName}</p> : null}
+              <p className="text-xs text-[#C9A9A6] mt-0.5">Range: {currentRangeLabel()}</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => fetchAll(true)}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#C9A9A6]/30 bg-white hover:bg-[#FFF8F0] transition-colors"
               title="Refresh"
             >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+              <RefreshCw className={`w-4 h-4 text-[#C9A9A6] ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline text-gray-700">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
             </button>
             <button
               onClick={downloadCSV}
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white hover:shadow-lg transition-all"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </button>
             <button
               onClick={handleLogout}
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-[#C9A9A6]/30 hover:bg-[#FFF8F0] transition-colors"
               title="Sign out"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-4 h-4 text-gray-700" />
               Log Out
             </button>
           </div>
@@ -370,7 +382,7 @@ export default function AdminDashboard({
       </div>
 
       {/* DESKTOP filters (md+) */}
-      <div className="px-6 py-4 border-b bg-white hidden md:block">
+      <div className="px-6 py-4 border-b border-[#C9A9A6]/20 bg-white/90 hidden md:block">
         <div className="max-w-7xl mx-auto grid grid-cols-12 gap-3">
           {/* Chips (desktop) */}
           <div className="col-span-5">
@@ -379,7 +391,11 @@ export default function AdminDashboard({
                 <button
                   key={c.key}
                   onClick={() => { setPage(1); setChip(c.key); setTab('calendar'); }}
-                  className={`px-3 py-1.5 rounded-full border text-sm ${chip === c.key && tab==='calendar' ? 'bg-black text-white' : 'bg-white'}`}
+                  className={`px-3 py-1.5 rounded-full border text-sm transition-all ${
+                    chip === c.key && tab==='calendar'
+                      ? 'bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white border-transparent'
+                      : 'bg-white border-[#C9A9A6]/30 hover:bg-[#FFF8F0]'
+                  }`}
                 >
                   {c.label}
                 </button>
@@ -394,7 +410,7 @@ export default function AdminDashboard({
                 value={q}
                 onChange={(e) => { setPage(1); setQ(e.target.value); }}
                 placeholder="Search name, phone, email, notes…"
-                className="w-full pl-9 pr-3 py-2 rounded-lg border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/10"
+                className="w-full pl-9 pr-3 py-2 rounded-lg border border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40 focus:border-[#C9A9A6]"
               />
             </div>
           </div>
@@ -403,7 +419,7 @@ export default function AdminDashboard({
             <select
               value={status}
               onChange={(e) => { setPage(1); setStatus(e.target.value); }}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300"
+              className="w-full px-3 py-2 rounded-lg border border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40 focus:border-[#C9A9A6]"
             >
               <option value="">All statuses</option>
               <option value="pending">Pending</option>
@@ -416,7 +432,7 @@ export default function AdminDashboard({
             <select
               value={service}
               onChange={(e) => { setPage(1); setService(e.target.value); }}
-              className="w-full px-3 py-2 rounded-lg border border-neutral-300"
+              className="w-full px-3 py-2 rounded-lg border border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40 focus:border-[#C9A9A6]"
             >
               <option value="">All services</option>
               {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -426,9 +442,9 @@ export default function AdminDashboard({
           {/* Custom range when chip === custom */}
           {chip === 'custom' && tab==='calendar' && (
             <div className="col-span-12 mt-2 flex gap-2">
-              <input type="date" value={customFrom} onChange={(e)=>{ setPage(1); setCustomFrom(e.target.value); }} className="px-3 py-2 rounded-lg border border-neutral-300" />
-              <input type="date" value={customTo}   onChange={(e)=>{ setPage(1); setCustomTo(e.target.value); }}   className="px-3 py-2 rounded-lg border border-neutral-300" />
-              <div className="flex items-center gap-2 text-neutral-500"><Filter className="w-4 h-4" /> Custom range</div>
+              <input type="date" value={customFrom} onChange={(e)=>{ setPage(1); setCustomFrom(e.target.value); }} className="px-3 py-2 rounded-lg border border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40" />
+              <input type="date" value={customTo}   onChange={(e)=>{ setPage(1); setCustomTo(e.target.value); }}   className="px-3 py-2 rounded-lg border border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40" />
+              <div className="flex items-center gap-2 text-[#C9A9A6]"><Filter className="w-4 h-4" /> Custom range</div>
             </div>
           )}
         </div>
@@ -439,7 +455,7 @@ export default function AdminDashboard({
         <div className="max-w-7xl mx-auto">
           {/* STATS tab (mobile & desktop) */}
           {tab === 'stats' && (
-            <div className="py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 animate-fade-in">
               <StatCard icon={<Database className="w-4 h-4" />} label="Total" value={counts.total} />
               <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={counts.pending} />
               <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Confirmed" value={counts.confirmed} />
@@ -452,24 +468,24 @@ export default function AdminDashboard({
           {/* SETTINGS tab (mobile & desktop) */}
           {tab === 'settings' && (
             <div className="py-6 space-y-3">
-              <div className="bg-white border rounded-xl p-4">
+              <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">Export CSV</div>
                     <div className="text-sm text-neutral-500">Download rows for the current range.</div>
                   </div>
-                  <button onClick={downloadCSV} className="px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 inline-flex items-center gap-2">
+                  <button onClick={downloadCSV} className="px-3 py-2 rounded-lg bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white hover:shadow-lg transition-all inline-flex items-center gap-2">
                     <Download className="w-4 h-4" /> Export
                   </button>
                 </div>
               </div>
-              <div className="bg-white border rounded-xl p-4">
+              <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">Sign out</div>
                     <div className="text-sm text-neutral-500">End your admin session.</div>
                   </div>
-                  <button onClick={handleLogout} className="px-3 py-2 rounded-lg border inline-flex items-center gap-2">
+                  <button onClick={handleLogout} className="px-3 py-2 rounded-lg border border-[#C9A9A6]/30 hover:bg-[#FFF8F0] transition-colors inline-flex items-center gap-2">
                     <LogOut className="w-4 h-4" /> Log Out
                   </button>
                 </div>
@@ -479,7 +495,7 @@ export default function AdminDashboard({
 
           {/* HOME & CALENDAR (card list + actions) */}
           {(tab === 'home' || tab === 'calendar') && (
-            <div className="bg-white border rounded-xl overflow-hidden">
+            <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl overflow-hidden shadow-sm">
               <div className="divide-y">
                 {loading && rows.length === 0 ? (
                   <>
@@ -488,21 +504,21 @@ export default function AdminDashboard({
                     <SkeletonCard />
                   </>
                 ) : filteredRows.length === 0 ? (
-                  <div className="p-8 text-center text-neutral-500">No bookings found.</div>
+                  <div className="p-8 text-center text-gray-500">No bookings found.</div>
                 ) : (
                   pageRows.map(row => (
-                    <div key={row.id} className="p-4 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div key={row.id} className="p-4 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-[#FFF8F0]/50 transition-colors">
                       <div className="space-y-1 min-w-0">
-                        <div className="font-medium text-neutral-900 truncate">{row.name || '—'}</div>
-                        <div className="text-sm text-neutral-600 truncate">
+                        <div className="font-medium text-gray-800 truncate">{row.name || '—'}</div>
+                        <div className="text-sm text-gray-600 truncate">
                           {row.service_type || 'Service'} • {row.preferred_date}{row.preferred_time ? ` • ${row.preferred_time}` : ''}
                         </div>
-                        <div className="text-xs text-neutral-500 truncate">{row.email}</div>
+                        <div className="text-xs text-gray-500 truncate">{row.email}</div>
                         <div className="flex items-center gap-2 mt-1">
                           <StatusPill status={row.status} />
                           <button
                             onClick={() => setContactFor(row.id)}
-                            className="text-xs px-2 py-1 rounded border hover:bg-neutral-50 inline-flex items-center gap-1"
+                            className="text-xs px-2 py-1 rounded border border-[#C9A9A6]/30 hover:bg-[#C9A9A6]/10 text-[#C9A9A6] inline-flex items-center gap-1 transition-colors"
                           >
                             Contact
                           </button>
@@ -519,13 +535,13 @@ export default function AdminDashboard({
                       </div>
                       <div className="flex items-center gap-2 sm:self-end">
                         {row.status !== 'confirmed' && (
-                          <button onClick={() => updateStatus(row.id, 'confirmed')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Confirm</button>
+                          <button onClick={() => updateStatus(row.id, 'confirmed')} className="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs hover:bg-emerald-50 transition-colors">Confirm</button>
                         )}
                         {row.status !== 'pending' && (
-                          <button onClick={() => updateStatus(row.id, 'pending')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Pending</button>
+                          <button onClick={() => updateStatus(row.id, 'pending')} className="px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 text-xs hover:bg-amber-50 transition-colors">Pending</button>
                         )}
                         {row.status !== 'cancelled' && (
-                          <button onClick={() => updateStatus(row.id, 'cancelled')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Cancel</button>
+                          <button onClick={() => updateStatus(row.id, 'cancelled')} className="px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 text-xs hover:bg-rose-50 transition-colors">Cancel</button>
                         )}
                       </div>
                     </div>
@@ -535,13 +551,13 @@ export default function AdminDashboard({
 
               {/* Pagination */}
               {filteredRows.length > 0 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t bg-neutral-50">
-                  <div className="text-xs text-neutral-500">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-[#C9A9A6]/20 bg-[#FFF8F0]">
+                  <div className="text-xs text-gray-600">
                     Page {page} of {Math.max(1, Math.ceil(filteredRows.length / pageSize))} • {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Prev</button>
-                    <button onClick={() => setPage(p => Math.min(Math.max(1, Math.ceil(filteredRows.length / pageSize)), p + 1))} disabled={page >= Math.ceil(filteredRows.length / pageSize)} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Next</button>
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg border border-[#C9A9A6]/30 text-xs disabled:opacity-40 hover:bg-white transition-colors">Prev</button>
+                    <button onClick={() => setPage(p => Math.min(Math.max(1, Math.ceil(filteredRows.length / pageSize)), p + 1))} disabled={page >= Math.ceil(filteredRows.length / pageSize)} className="px-3 py-1.5 rounded-lg border border-[#C9A9A6]/30 text-xs disabled:opacity-40 hover:bg-white transition-colors">Next</button>
                   </div>
                 </div>
               )}
@@ -554,7 +570,7 @@ export default function AdminDashboard({
       {(tab === 'home' || tab === 'calendar') && (
         <button
           onClick={() => window.open('/book', '_blank')}
-          className="fixed bottom-20 right-6 md:hidden rounded-full shadow-lg bg-neutral-900 text-white p-4"
+          className="fixed bottom-20 right-6 md:hidden rounded-full shadow-lg bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white p-4 hover:shadow-xl transition-all"
           title="Add booking"
         >
           <Plus className="w-5 h-5" />
@@ -562,7 +578,7 @@ export default function AdminDashboard({
       )}
 
       {/* Bottom Navigation (mobile only) */}
-      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t shadow-sm z-40">
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 backdrop-blur-sm border-t border-[#C9A9A6]/20 shadow-sm z-40">
         <div className="max-w-7xl mx-auto grid grid-cols-4 text-xs">
           <TabButton active={tab==='home'}     onClick={()=>{ setTab('home');     setPage(1); }} icon={<HomeIcon className="w-5 h-5" />}     label="Home"     bump={bumpHome} />
           <TabButton active={tab==='calendar'} onClick={()=>{ setTab('calendar'); setPage(1); }} icon={<CalendarDays className="w-5 h-5" />} label="Calendar" bump={bumpCalendar} />
@@ -576,10 +592,10 @@ export default function AdminDashboard({
         {toastList.map(t => (
           <div
             key={t.id}
-            className={`px-3 py-2 rounded-lg shadow border text-sm ${
-              t.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              : t.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800'
-              : 'bg-neutral-50 border-neutral-200 text-neutral-800'
+            className={`px-4 py-3 rounded-xl shadow-lg border text-sm font-medium ${
+              t.type === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+              : t.type === 'error' ? 'bg-rose-50 border-rose-300 text-rose-800'
+              : 'bg-[#FFF8F0] border-[#C9A9A6]/40 text-gray-800'
             }`}
           >
             {t.msg}
@@ -596,32 +612,34 @@ function TabButton({ active, onClick, icon, label, bump }:{
   active: boolean; onClick: ()=>void; icon: React.ReactNode; label: string; bump?: boolean;
 }) {
   return (
-    <button onClick={onClick} className={`relative flex flex-col items-center justify-center py-2 ${active ? 'text-black' : 'text-neutral-500'}`}>
+    <button onClick={onClick} className={`relative flex flex-col items-center justify-center py-2 transition-colors ${
+      active ? 'text-[#C9A9A6]' : 'text-gray-500 hover:text-[#C9A9A6]'
+    }`}>
       {icon}
-      <span className="mt-0.5">{label}</span>
-      {bump && <span className="absolute top-1 right-6 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+      <span className="mt-0.5 text-xs">{label}</span>
+      {bump && <span className="absolute top-1 right-6 h-2 w-2 rounded-full bg-[#C9A9A6] animate-pulse" />}
     </button>
   );
 }
 
 function StatusPill({ status }: { status: 'pending'|'confirmed'|'cancelled' }) {
   const cls =
-    status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-    status === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
-    'bg-amber-50 text-amber-700 border border-amber-200';
-  return <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs ${cls}`}>{status}</span>;
+    status === 'confirmed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' :
+    status === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-300' :
+    'bg-amber-50 text-amber-700 border border-amber-300';
+  return <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cls}`}>{status}</span>;
 }
 
 function SkeletonCard() {
   return (
     <div className="p-4 animate-pulse">
-      <div className="h-4 w-1/3 bg-neutral-200 rounded mb-2" />
-      <div className="h-3 w-1/2 bg-neutral-200 rounded mb-2" />
-      <div className="h-3 w-1/4 bg-neutral-200 rounded mb-3" />
+      <div className="h-4 w-1/3 bg-[#C9A9A6]/20 rounded mb-2" />
+      <div className="h-3 w-1/2 bg-[#C9A9A6]/20 rounded mb-2" />
+      <div className="h-3 w-1/4 bg-[#C9A9A6]/20 rounded mb-3" />
       <div className="flex gap-2">
-        <div className="h-7 w-20 bg-neutral-200 rounded" />
-        <div className="h-7 w-20 bg-neutral-200 rounded" />
-        <div className="h-7 w-20 bg-neutral-200 rounded" />
+        <div className="h-7 w-20 bg-[#C9A9A6]/20 rounded" />
+        <div className="h-7 w-20 bg-[#C9A9A6]/20 rounded" />
+        <div className="h-7 w-20 bg-[#C9A9A6]/20 rounded" />
       </div>
     </div>
   );
@@ -638,16 +656,16 @@ function ContactSheet({
 }) {
   return (
     <div className="relative">
-      <div className="absolute z-20 mt-2 p-2 bg-white border rounded-lg shadow-lg">
-        <div className="text-xs text-neutral-500 px-2 pt-1 pb-2">Contact</div>
-        <button onClick={() => { onWhatsApp(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-neutral-50">
-          <MessageCircle className="w-4 h-4" /> WhatsApp
+      <div className="absolute z-20 mt-2 p-2 bg-white border border-[#C9A9A6]/20 rounded-xl shadow-lg">
+        <div className="text-xs text-[#C9A9A6] font-medium px-2 pt-1 pb-2">Contact</div>
+        <button onClick={() => { onWhatsApp(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FFF8F0] transition-colors text-gray-700">
+          <MessageCircle className="w-4 h-4 text-[#C9A9A6]" /> WhatsApp
         </button>
-        <button onClick={() => { onCall(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-neutral-50">
-          <Phone className="w-4 h-4" /> Call
+        <button onClick={() => { onCall(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FFF8F0] transition-colors text-gray-700">
+          <Phone className="w-4 h-4 text-[#C9A9A6]" /> Call
         </button>
-        <button onClick={() => { onCopy(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-neutral-50">
-          <Copy className="w-4 h-4" /> Copy number
+        <button onClick={() => { onCopy(); onClose(); }} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[#FFF8F0] transition-colors text-gray-700">
+          <Copy className="w-4 h-4 text-[#C9A9A6]" /> Copy number
         </button>
       </div>
       <div className="fixed inset-0 z-10" onClick={onClose} />
@@ -657,12 +675,12 @@ function ContactSheet({
 
 function StatCard({ icon, label, value }:{ icon: React.ReactNode; label: string; value: number | string; }) {
   return (
-    <div className="bg-white border rounded-xl p-4">
+    <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center justify-between">
-        <div className="text-neutral-500 text-xs">{label}</div>
-        <div className="text-neutral-400">{icon}</div>
+        <div className="text-gray-600 text-xs font-medium">{label}</div>
+        <div className="text-[#C9A9A6]">{icon}</div>
       </div>
-      <div className="mt-2 text-2xl font-semibold text-neutral-900">{value}</div>
+      <div className="mt-2 text-2xl font-semibold bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] bg-clip-text text-transparent">{value}</div>
     </div>
   );
 }

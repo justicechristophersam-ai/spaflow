@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { Flower2 } from 'lucide-react';
 
 export default function AdminLogin({ onLogin }: { onLogin: (user: any) => void }) {
   const [username, setUsername] = useState('');
@@ -42,33 +43,39 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: any) => void }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0] px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#FFF8F0] via-[#EAC7C7]/20 to-[#FFF8F0] px-4">
       <form
         onSubmit={handleLogin}
-        className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm"
+        className="bg-white/90 backdrop-blur-sm p-8 rounded-3xl shadow-2xl w-full max-w-sm border border-[#C9A9A6]/20"
       >
-        <h1 className="text-2xl font-bold mb-4 text-gray-800">Admin Login</h1>
+        <div className="flex items-center justify-center space-x-3 mb-6">
+          <Flower2 className="w-10 h-10 text-[#C9A9A6]" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">LunaBloom</h1>
+            <p className="text-xs text-gray-500">Admin Portal</p>
+          </div>
+        </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
           <input
             type="text"
             required
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]"
+            className="w-full px-4 py-3 border-2 rounded-xl border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40 focus:border-[#C9A9A6] transition-colors"
             placeholder="admin"
           />
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
           <input
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]"
+            className="w-full px-4 py-3 border-2 rounded-xl border-[#C9A9A6]/30 focus:outline-none focus:ring-2 focus:ring-[#C9A9A6]/40 focus:border-[#C9A9A6] transition-colors"
             placeholder="•••••••"
           />
         </div>
@@ -76,12 +83,23 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: any) => void }
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white py-2 rounded-lg font-semibold hover:shadow-lg transition-all"
+          className="w-full bg-gradient-to-r from-[#EAC7C7] to-[#C9A9A6] text-white py-3 rounded-xl font-semibold hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Logging in...' : 'Login'}
         </button>
 
-        {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+        {error && <p className="text-sm text-rose-600 mt-4 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">{error}</p>}
+
+        <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-[#C9A9A6] hover:text-[#B89896] transition-colors"
+          >
+            ← Back to LunaBloom Spa
+          </a>
+        </div>
       </form>
     </div>
   );
