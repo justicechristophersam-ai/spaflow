@@ -344,7 +344,7 @@ export default function AdminDashboard({
               title="Visit LunaBloom Spa"
             >
               <Flower2 className="w-8 h-8 text-[#C9A9A6] transition-transform duration-200 group-hover:rotate-12" />
-              <span className="text-xl font-semibold text-gray-800 group-hover:text-[#C9A9A6] transition-colors">LunaBloom</span>
+              <span className="text-xl font-semibold text-gray-800 group-hover:text-[#C9A9A6] transition-colors"></span>
             </a>
             <div className="border-l border-gray-300 pl-4 ml-2">
               <h1 className="text-lg font-medium text-gray-700">Admin Dashboard</h1>
