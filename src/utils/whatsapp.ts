@@ -1,27 +1,57 @@
 // src/utils/whatsapp.ts
 
-// ✅ Converts local Ghana numbers (0XXXXXXXXX) into international format (233XXXXXXXXX)
-export function toE164(rawPhone: string, defaultCountry: 'GH' | 'INTL' = 'GH') {
-  let p = (rawPhone || '').replace(/[^\d]/g, '');
-  if (!p) return '';
+// Normalize a Ghana phone number into E.164 (233XXXXXXXXX)
+export function normalizeGhanaNumber(raw: string) {
+  if (!raw) return '';
 
-  if (defaultCountry === 'GH') {
-    if (p.startsWith('0') && p.length === 10) p = '233' + p.slice(1);
+  let s = String(raw).trim();
+
+  // Keep a leading + for now so we can strip it cleanly, then remove all other non-digits
+  if (s.startsWith('+')) s = s.slice(1);
+  // Handle "00" international prefix
+  if (s.startsWith('00')) s = s.slice(2);
+
+  // Remove any remaining non-digits
+  s = s.replace(/\D/g, '');
+
+  if (!s) return '';
+
+  // CASES:
+  // 1) Local format 0XXXXXXXXX (10 digits) -> 233XXXXXXXXX
+  if (s.length === 10 && s.startsWith('0')) {
+    s = '233' + s.slice(1);
   }
-  return p;
+
+  // 2) Bare national number without 0 (9 digits) -> 233XXXXXXXXX
+  if (s.length === 9 && !s.startsWith('233')) {
+    s = '233' + s;
+  }
+
+  // 3) Already has country code but contains the local 0 -> 2330XXXXXXXX -> drop the 0
+  //    Sometimes stored as 2330XXXXXXXXX (13 digits total)
+  if (s.startsWith('2330') && s.length === 13) {
+    s = '233' + s.slice(4);
+  }
+
+  // 4) Already in correct E.164: 233XXXXXXXXX (12 digits)
+  // Validate final shape
+  if (s.startsWith('233') && s.length === 12) {
+    return s;
+  }
+
+  // Anything else is invalid for our purposes
+  return '';
 }
 
-// ✅ Builds a WhatsApp deeplink with prefilled text
 export function buildWhatsAppLink(phoneRaw: string, message: string) {
-  const phone = toE164(phoneRaw, 'GH');
+  const phone = normalizeGhanaNumber(phoneRaw);
   if (!phone) return '';
-  const text = encodeURIComponent(message);
-  return `https://wa.me/${phone}?text=${text}`;
+  const text = message ? `?text=${encodeURIComponent(message)}` : '';
+  return `https://wa.me/${phone}${text}`;
 }
 
-// ✅ Formats a combined date/time for human-readable message
 export function formatDateTime(dateISO: string, timeHHMM: string, tz = 'Africa/Accra') {
-  const dt = new Date(`${dateISO}T${timeHHMM}:00`);
+  const dt = new Date(`${dateISO}T${timeHHMM || '00:00'}:00`);
   const dateStr = new Intl.DateTimeFormat('en-GB', {
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', timeZone: tz,
   }).format(dt);
@@ -31,7 +61,6 @@ export function formatDateTime(dateISO: string, timeHHMM: string, tz = 'Africa/A
   return { dateStr, timeStr };
 }
 
-// ✅ Creates the confirmation message content
 export function bookingMessageTemplate(b: {
   firstName?: string;
   serviceName: string;
