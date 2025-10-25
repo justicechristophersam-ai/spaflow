@@ -7,6 +7,9 @@ import {
   Home as HomeIcon, CalendarDays, BarChart2, Settings as SettingsIcon, LogOut, Flower2
 } from 'lucide-react';
 
+// ✅ ADDED: import WhatsApp helpers (from the helper file you created)
+import { buildWhatsAppLink, bookingMessageTemplate, formatDateTime } from '../utils/whatsapp';
+
 type BookingRow = {
   id: string;
   name: string;
@@ -258,6 +261,49 @@ export default function AdminDashboard({
       pushToast('error', 'Could not update status.');
     } else {
       pushToast('success', `Marked as ${newStatus}.`);
+    }
+  }
+
+  // ✅ ADDED: Confirm → update Supabase → open WhatsApp with prefilled message
+  async function confirmAndWhatsApp(row: BookingRow) {
+    try {
+      // Update status to confirmed (no optimistic UI here to avoid mismatch if RPC fails)
+      const { error } = await supabase.rpc('update_booking_status_admin', {
+        p_token: token, p_id: row.id, p_new_status: 'confirmed',
+      });
+      if (error) {
+        console.error('Confirm RPC failed:', error);
+        pushToast('error', 'Could not confirm booking.');
+        return;
+      }
+
+      // Refresh local row to show "confirmed"
+      setRows(rs => rs.map(r => (r.id === row.id ? { ...r, status: 'confirmed' } : r)));
+      pushToast('success', 'Marked as confirmed. Opening WhatsApp…');
+
+      // Build prefilled WhatsApp message
+      const { dateStr, timeStr } = formatDateTime(row.preferred_date, row.preferred_time, 'Africa/Accra');
+      const msg = bookingMessageTemplate({
+        firstName: row.name?.split(' ')[0],
+        serviceName: row.service_type,
+        dateStr,
+        timeStr,
+        businessName: 'LunaBloom Spa',      // ← change to your brand if needed
+        location: 'Ridge, Accra',           // ← your address
+        phoneForCalls: '+233 55 000 0000',  // ← your phone line
+      });
+
+      const wa = buildWhatsAppLink(row.whatsapp, msg);
+      if (!wa) {
+        pushToast('error', 'No valid WhatsApp number for this client.');
+        return;
+      }
+
+      // Open WhatsApp (Web on desktop / App on mobile)
+      window.open(wa, '_blank', 'noopener');
+    } catch (e) {
+      console.error(e);
+      pushToast('error', 'Something went wrong confirming booking.');
     }
   }
 
@@ -535,7 +581,8 @@ export default function AdminDashboard({
                       </div>
                       <div className="flex items-center gap-2 sm:self-end">
                         {row.status !== 'confirmed' && (
-                          <button onClick={() => updateStatus(row.id, 'confirmed')} className="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs hover:bg-emerald-50 transition-colors">Confirm</button>
+                          // ✅ CHANGED: Confirm now uses confirmAndWhatsApp(row)
+                          <button onClick={() => confirmAndWhatsApp(row)} className="px-3 py-1.5 rounded-lg border border-emerald-200 text-emerald-700 text-xs hover:bg-emerald-50 transition-colors">Confirm</button>
                         )}
                         {row.status !== 'pending' && (
                           <button onClick={() => updateStatus(row.id, 'pending')} className="px-3 py-1.5 rounded-lg border border-amber-200 text-amber-700 text-xs hover:bg-amber-50 transition-colors">Pending</button>
