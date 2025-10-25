@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   CalendarRange, CheckCircle2, Clock, Database, Download, Filter,
-  Loader2, Search, Users, XCircle, RefreshCw, Phone, MessageCircle, Copy, Plus
+  Loader2, Search, Users, XCircle, RefreshCw, Phone, MessageCircle, Copy, Plus,
+  Home as HomeIcon, CalendarDays, BarChart2, Settings as SettingsIcon, LogOut
 } from 'lucide-react';
 
 type BookingRow = {
@@ -38,24 +39,17 @@ function startOfWeek(d = new Date()) {
 }
 
 type ChipKey = 'upcoming' | 'today' | 'week' | 'last30' | 'all' | 'custom';
+type TabKey  = 'home' | 'calendar' | 'stats' | 'settings';
 
 function rangeForChip(c: ChipKey) {
   const today = new Date();
   switch (c) {
-    case 'upcoming':
-      return { from: toISO(today), to: toISO(addDays(today, 90)) };
-    case 'today':
-      return { from: toISO(today), to: toISO(today) };
-    case 'week': {
-      const ws = startOfWeek(today);
-      return { from: toISO(ws), to: toISO(addDays(ws, 6)) };
-    }
-    case 'last30':
-      return { from: toISO(addDays(today, -30)), to: toISO(today) };
-    case 'all':
-      return { from: null as string | null, to: null as string | null };
-    case 'custom':
-      return { from: null as string | null, to: null as string | null };
+    case 'upcoming': return { from: toISO(today), to: toISO(addDays(today, 90)) };
+    case 'today':    return { from: toISO(today), to: toISO(today) };
+    case 'week':     { const ws = startOfWeek(today); return { from: toISO(ws), to: toISO(addDays(ws, 6)) }; }
+    case 'last30':   return { from: toISO(addDays(today, -30)), to: toISO(today) };
+    case 'all':      return { from: null as string | null, to: null as string | null };
+    case 'custom':   return { from: null as string | null, to: null as string | null };
   }
 }
 
@@ -68,23 +62,33 @@ export default function AdminDashboard({
   onLogout: () => void;
   adminName?: string | null;
 }) {
-  // chips & filters
-  const [chip, setChip] = useState<ChipKey>('upcoming'); // DEFAULT = Upcoming (today → +90)
+  // NEW: mobile tabs
+  const [tab, setTab] = useState<TabKey>('home'); // home|calendar|stats|settings
+
+  // chips & filters (used on desktop and on Calendar tab)
+  const [chip, setChip] = useState<ChipKey>('upcoming'); // default for Calendar
   const [q, setQ] = useState('');
   const [service, setService] = useState<string>('');
   const [status, setStatus] = useState<string>('');
 
-  // custom date range (only used when chip === 'custom')
+  // custom date range (for chip === 'custom')
   const [customFrom, setCustomFrom] = useState<string>(toISO(startOfWeek(new Date())));
   const [customTo,   setCustomTo]   = useState<string>(toISO(new Date()));
 
-  // derived range to send to RPC
+  // derived range depends on TAB (mobile) or chips (desktop/calendar)
   const derived = useMemo(() => {
-    if (chip === 'custom') {
-      return { from: customFrom || null, to: customTo || null };
+    if (tab === 'home') {
+      const today = toISO(new Date());
+      return { from: today, to: today }; // Home = Today
     }
+    if (tab === 'calendar') {
+      if (chip === 'custom') return { from: customFrom || null, to: customTo || null };
+      return rangeForChip(chip); // Upcoming/Week/Last30/All
+    }
+    // Stats borrows Calendar's range; Settings doesn't fetch
+    if (chip === 'custom') return { from: customFrom || null, to: customTo || null };
     return rangeForChip(chip);
-  }, [chip, customFrom, customTo]);
+  }, [tab, chip, customFrom, customTo]);
 
   // data
   const [rows, setRows] = useState<BookingRow[]>([]);
@@ -99,8 +103,8 @@ export default function AdminDashboard({
   // micro-interactions
   const [toastList, setToastList] = useState<Array<{ id: string; type: 'success'|'error'|'info'; msg: string }>>([]);
   const [contactFor, setContactFor] = useState<string | null>(null); // booking id for contact sheet
-  const [bumpUpcoming, setBumpUpcoming] = useState(false);
-  const [bumpAll, setBumpAll] = useState(false);
+  const [bumpHome, setBumpHome] = useState(false);
+  const [bumpCalendar, setBumpCalendar] = useState(false);
 
   // keep last fetched range to compare realtime entries
   const lastRangeRef = useRef<{from: string|null, to: string|null}>({ from: derived.from, to: derived.to });
@@ -129,52 +133,51 @@ export default function AdminDashboard({
       const d_from = derived.from ?? null;
       const d_to   = derived.to   ?? null;
 
-      const [{ data, error }, { data: stats, error: statsErr }] = await Promise.all([
-        supabase.rpc('list_bookings_admin', {
-          p_token: token,
-          d_from,
-          d_to,
-          p_service: service || null,
-          p_status: status || null,
-        }),
-        supabase.rpc('get_booking_counts_admin', {
-          p_token: token,
-          d_from,
-          d_to,
-        }),
+      // Only fetch rows for tabs that need them (Home/Calendar)
+      const needRows = tab === 'home' || tab === 'calendar';
+      const [listRes, statsRes] = await Promise.all([
+        needRows
+          ? supabase.rpc('list_bookings_admin', {
+              p_token: token, d_from, d_to, p_service: service || null, p_status: status || null,
+            })
+          : Promise.resolve({ data: [] as any[], error: null } as any),
+        supabase.rpc('get_booking_counts_admin', { p_token: token, d_from, d_to }),
       ]);
 
-      if (error) throw error;
-      if (statsErr) throw statsErr;
+      if (listRes.error) throw listRes.error;
+      if (statsRes.error) throw statsRes.error;
 
-      const safeRows = (data ?? []).map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        whatsapp: r.whatsapp,
-        email: r.email,
-        service_type: r.service_type,
-        preferred_date: r.preferred_date,
-        preferred_time: String(r.preferred_time ?? '').slice(0,5),
-        status: r.status,
-        created_at: r.created_at,
-        notes: r.notes ?? ''
-      })) as BookingRow[];
+      if (needRows) {
+        const safeRows = (listRes.data ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          whatsapp: r.whatsapp,
+          email: r.email,
+          service_type: r.service_type,
+          preferred_date: r.preferred_date,
+          preferred_time: String(r.preferred_time ?? '').slice(0,5),
+          status: r.status,
+          created_at: r.created_at,
+          notes: r.notes ?? ''
+        })) as BookingRow[];
 
-      const needle = q.trim().toLowerCase();
-      const filtered = needle
-        ? safeRows.filter(r =>
-            (r.name || '').toLowerCase().includes(needle) ||
-            (r.whatsapp || '').toLowerCase().includes(needle) ||
-            (r.email || '').toLowerCase().includes(needle) ||
-            (r.notes || '').toLowerCase().includes(needle) ||
-            (r.service_type || '').toLowerCase().includes(needle)
-          )
-        : safeRows;
+        const needle = q.trim().toLowerCase();
+        const filtered = needle
+          ? safeRows.filter(r =>
+              (r.name || '').toLowerCase().includes(needle) ||
+              (r.whatsapp || '').toLowerCase().includes(needle) ||
+              (r.email || '').toLowerCase().includes(needle) ||
+              (r.notes || '').toLowerCase().includes(needle) ||
+              (r.service_type || '').toLowerCase().includes(needle)
+            )
+          : safeRows;
 
-      setRows(filtered);
+        setRows(filtered);
+      }
 
+      const stats = statsRes.data as any[];
       if (stats && stats.length > 0) {
-        const s = stats[0] as any;
+        const s = stats[0];
         setCounts({
           total: Number(s.total ?? 0),
           pending: Number(s.pending ?? 0),
@@ -186,51 +189,51 @@ export default function AdminDashboard({
       }
 
       // reset bump dots when we change range or refresh
-      setBumpUpcoming(false);
-      setBumpAll(false);
+      setBumpHome(false);
+      setBumpCalendar(false);
       lastRangeRef.current = { from: d_from, to: d_to };
     } catch (e: any) {
       console.error('Admin fetch error:', e);
-      setError(e.message || 'Failed to load bookings');
-      pushToast('error', 'Failed to load bookings');
+      setError(e.message || 'Failed to load data');
+      pushToast('error', 'Failed to load data');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }
 
+  // Fetch on tab/chip/filter change
   useEffect(() => {
     fetchAll(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, chip, service, status]); // q is client-side filter; dates are derived from chip
+  }, [token, tab, chip, service, status]);
 
-  // realtime + bump logic
+  // Realtime with tab-aware bumps
   useEffect(() => {
     const channel = supabase
       .channel('bookings-admin')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload: any) => {
-        // new or updated booking
         const b = payload.new || payload.record;
         if (!b) return;
 
-        // if the new/updated row falls in current range -> refresh list softly
         if (b.preferred_date && inCurrentRange(b.preferred_date)) {
-          fetchAll(true);
-          pushToast('info', 'New booking received');
+          if (tab === 'home' || tab === 'calendar') {
+            fetchAll(true);
+            pushToast('info', 'New booking received');
+          }
         } else {
-          // outside current view -> set bump dot
           const todayISO = toISO(new Date());
-          if (b.preferred_date >= todayISO) setBumpUpcoming(true);
-          else setBumpAll(true);
+          if (b.preferred_date === todayISO) setBumpHome(true);
+          else setBumpCalendar(true);
         }
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chip, service, status]);
+  }, [tab, chip, service, status]);
 
-  // client-side search filter
+  // client-side search (applies where rows exist)
   const filteredRows = useMemo(() => {
     if (!q) return rows;
     const needle = q.toLowerCase();
@@ -247,12 +250,10 @@ export default function AdminDashboard({
     const prev = rows.slice();
     setRows(rs => rs.map(r => (r.id === id ? { ...r, status: newStatus } : r)));
     const { error } = await supabase.rpc('update_booking_status_admin', {
-      p_token: token,
-      p_id: id,
-      p_new_status: newStatus,
+      p_token: token, p_id: id, p_new_status: newStatus,
     });
     if (error) {
-      console.error('Update status RPC failed:', error);
+      console.error('Update status failed:', error);
       setRows(prev);
       pushToast('error', 'Could not update status.');
     } else {
@@ -265,7 +266,16 @@ export default function AdminDashboard({
     finally { onLogout(); }
   }
 
+  // Helpers
   function currentRangeLabel() {
+    if (tab === 'home') return 'Today';
+    if (tab === 'calendar') {
+      if (chip === 'all') return 'All time';
+      if (chip === 'custom') return `${customFrom || '—'} → ${customTo || '—'}`;
+      const { from, to } = rangeForChip(chip);
+      return `${from ?? '—'} → ${to ?? '—'}`;
+    }
+    // stats/settings display same label as calendar
     if (chip === 'all') return 'All time';
     if (chip === 'custom') return `${customFrom || '—'} → ${customTo || '—'}`;
     const { from, to } = rangeForChip(chip);
@@ -283,7 +293,8 @@ export default function AdminDashboard({
       ];
       lines.push(vals.map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(','));
     });
-    const label = chip === 'all' ? 'all_time'
+    const label = tab === 'home' ? 'today'
+      : chip === 'all' ? 'all_time'
       : chip === 'custom' ? `${customFrom || 'na'}_to_${customTo || 'na'}`
       : currentRangeLabel().replace(/\s|→/g,'');
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
@@ -295,7 +306,7 @@ export default function AdminDashboard({
   }
 
   function openWhatsApp(raw: string) {
-    const cleaned = (raw || '').replace(/\D/g, ''); // digits only
+    const cleaned = (raw || '').replace(/\D/g, '');
     if (!cleaned) { pushToast('error', 'No valid phone number'); return; }
     window.open(`https://wa.me/${cleaned}`, '_blank');
   }
@@ -305,30 +316,27 @@ export default function AdminDashboard({
     window.location.href = `tel:${cleaned}`;
   }
   async function copyNumber(raw: string) {
-    try {
-      await navigator.clipboard.writeText(raw || '');
-      pushToast('success', 'Number copied');
-    } catch {
-      pushToast('error', 'Copy failed');
-    }
+    try { await navigator.clipboard.writeText(raw || ''); pushToast('success', 'Number copied'); }
+    catch { pushToast('error', 'Copy failed'); }
   }
 
   const chips: { key: ChipKey; label: string; bump?: boolean }[] = [
-    { key: 'upcoming', label: 'Upcoming', bump: bumpUpcoming },
+    { key: 'upcoming', label: 'Upcoming' },
     { key: 'today',    label: 'Today' },
     { key: 'week',     label: 'This Week' },
     { key: 'last30',   label: 'Last 30 days' },
-    { key: 'all',      label: 'All time', bump: bumpAll },
+    { key: 'all',      label: 'All time' },
     { key: 'custom',   label: 'Custom' },
   ];
 
+  // ---------- UI ----------
   return (
     <div className="min-h-screen bg-neutral-50 relative">
       {/* Header */}
       <div className="px-6 py-6 border-b bg-white sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Admin Dashboard</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">LunaBloom — Admin Dashboard</h1>
             {adminName ? <p className="text-sm text-neutral-500">Signed in as {adminName}</p> : null}
             <p className="text-xs text-neutral-400 mt-1">Range: {currentRangeLabel()}</p>
           </div>
@@ -340,7 +348,7 @@ export default function AdminDashboard({
               title="Refresh"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing…' : 'Refresh'}
+              <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
             </button>
             <button
               onClick={downloadCSV}
@@ -351,38 +359,35 @@ export default function AdminDashboard({
             </button>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-lg border"
               title="Sign out"
             >
+              <LogOut className="w-4 h-4" />
               Log Out
             </button>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="px-6 py-4 border-b bg-white">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-6 gap-3">
-          {/* Chips */}
-          <div className="md:col-span-3">
+      {/* DESKTOP filters (md+) */}
+      <div className="px-6 py-4 border-b bg-white hidden md:block">
+        <div className="max-w-7xl mx-auto grid grid-cols-12 gap-3">
+          {/* Chips (desktop) */}
+          <div className="col-span-5">
             <div className="flex flex-wrap gap-2">
               {chips.map(c => (
                 <button
                   key={c.key}
-                  onClick={() => { setPage(1); setChip(c.key); }}
-                  className={`relative px-3 py-1.5 rounded-full border text-sm ${chip === c.key ? 'bg-black text-white' : 'bg-white'}`}
+                  onClick={() => { setPage(1); setChip(c.key); setTab('calendar'); }}
+                  className={`px-3 py-1.5 rounded-full border text-sm ${chip === c.key && tab==='calendar' ? 'bg-black text-white' : 'bg-white'}`}
                 >
                   {c.label}
-                  {c.bump && (
-                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  )}
                 </button>
               ))}
             </div>
           </div>
-
           {/* Search */}
-          <div className="md:col-span-2">
+          <div className="col-span-3">
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
               <input
@@ -393,9 +398,8 @@ export default function AdminDashboard({
               />
             </div>
           </div>
-
           {/* Status */}
-          <div>
+          <div className="col-span-2">
             <select
               value={status}
               onChange={(e) => { setPage(1); setStatus(e.target.value); }}
@@ -407,9 +411,8 @@ export default function AdminDashboard({
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
-
           {/* Service */}
-          <div>
+          <div className="col-span-2">
             <select
               value={service}
               onChange={(e) => { setPage(1); setService(e.target.value); }}
@@ -419,129 +422,157 @@ export default function AdminDashboard({
               {SERVICES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-        </div>
 
-        {/* Custom date range (only visible when chip === 'custom') */}
-        {chip === 'custom' && (
-          <div className="max-w-7xl mx-auto mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
-            <div className="md:col-span-2 flex gap-2">
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => { setPage(1); setCustomFrom(e.target.value); }}
-                className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300"
-                aria-label="From"
-              />
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => { setPage(1); setCustomTo(e.target.value); }}
-                className="w-1/2 px-3 py-2 rounded-lg border border-neutral-300"
-                aria-label="To"
-              />
-            </div>
-            <div className="hidden md:flex items-center gap-2 text-neutral-500">
-              <Filter className="w-4 h-4" />
-              Custom range
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Stat cards */}
-      <div className="px-6 py-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-          <StatCard icon={<Database className="w-4 h-4" />} label="Total" value={counts.total} />
-          <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={counts.pending} />
-          <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Confirmed" value={counts.confirmed} />
-          <StatCard icon={<XCircle className="w-4 h-4" />} label="Cancelled" value={counts.cancelled} />
-          <StatCard icon={<CalendarRange className="w-4 h-4" />} label="Today" value={counts.today} />
-          <StatCard icon={<Users className="w-4 h-4" />} label="This week" value={counts.this_week} />
-        </div>
-      </div>
-
-      {/* Mobile-friendly list with skeletons */}
-      <div className="px-6 pb-20">
-        <div className="max-w-7xl mx-auto bg-white border rounded-xl overflow-hidden">
-          <div className="divide-y">
-            {loading && rows.length === 0 ? (
-              <>
-                <SkeletonCard />
-                <SkeletonCard />
-                <SkeletonCard />
-              </>
-            ) : filteredRows.length === 0 ? (
-              <div className="p-8 text-center text-neutral-500">No bookings found.</div>
-            ) : (
-              pageRows.map(row => (
-                <div key={row.id} className="p-4 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="space-y-1 min-w-0">
-                    <div className="font-medium text-neutral-900 truncate">{row.name || '—'}</div>
-                    <div className="text-sm text-neutral-600 truncate">
-                      {row.service_type || 'Service'} • {row.preferred_date}{row.preferred_time ? ` • ${row.preferred_time}` : ''}
-                    </div>
-                    <div className="text-xs text-neutral-500 truncate">{row.email}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <StatusPill status={row.status} />
-                      <button
-                        onClick={() => setContactFor(row.id)}
-                        className="text-xs px-2 py-1 rounded border hover:bg-neutral-50 inline-flex items-center gap-1"
-                      >
-                        Contact
-                      </button>
-                      {contactFor === row.id && (
-                        <ContactSheet
-                          phone={row.whatsapp}
-                          onClose={() => setContactFor(null)}
-                          onWhatsApp={() => openWhatsApp(row.whatsapp)}
-                          onCall={() => callNumber(row.whatsapp)}
-                          onCopy={() => copyNumber(row.whatsapp)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 sm:self-end">
-                    {row.status !== 'confirmed' && (
-                      <button onClick={() => updateStatus(row.id, 'confirmed')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Confirm</button>
-                    )}
-                    {row.status !== 'pending' && (
-                      <button onClick={() => updateStatus(row.id, 'pending')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Pending</button>
-                    )}
-                    {row.status !== 'cancelled' && (
-                      <button onClick={() => updateStatus(row.id, 'cancelled')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Cancel</button>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Pagination */}
-          {filteredRows.length > 0 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t bg-neutral-50">
-              <div className="text-xs text-neutral-500">
-                Page {page} of {Math.max(1, Math.ceil(filteredRows.length / pageSize))} • {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Prev</button>
-                <button onClick={() => setPage(p => Math.min(Math.max(1, Math.ceil(filteredRows.length / pageSize)), p + 1))} disabled={page >= Math.ceil(filteredRows.length / pageSize)} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Next</button>
-              </div>
+          {/* Custom range when chip === custom */}
+          {chip === 'custom' && tab==='calendar' && (
+            <div className="col-span-12 mt-2 flex gap-2">
+              <input type="date" value={customFrom} onChange={(e)=>{ setPage(1); setCustomFrom(e.target.value); }} className="px-3 py-2 rounded-lg border border-neutral-300" />
+              <input type="date" value={customTo}   onChange={(e)=>{ setPage(1); setCustomTo(e.target.value); }}   className="px-3 py-2 rounded-lg border border-neutral-300" />
+              <div className="flex items-center gap-2 text-neutral-500"><Filter className="w-4 h-4" /> Custom range</div>
             </div>
           )}
         </div>
       </div>
 
-      {/* FAB: Add booking (uses existing public booking flow) */}
-      <button
-        onClick={() => window.open('/book', '_blank')}
-        className="fixed bottom-6 right-6 md:hidden rounded-full shadow-lg bg-neutral-900 text-white p-4"
-        title="Add booking"
-      >
-        <Plus className="w-5 h-5" />
-      </button>
+      {/* CONTENT */}
+      <div className="px-6 pb-24 md:pb-10">
+        <div className="max-w-7xl mx-auto">
+          {/* STATS tab (mobile & desktop) */}
+          {tab === 'stats' && (
+            <div className="py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+              <StatCard icon={<Database className="w-4 h-4" />} label="Total" value={counts.total} />
+              <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={counts.pending} />
+              <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Confirmed" value={counts.confirmed} />
+              <StatCard icon={<XCircle className="w-4 h-4" />} label="Cancelled" value={counts.cancelled} />
+              <StatCard icon={<CalendarRange className="w-4 h-4" />} label="Today" value={counts.today} />
+              <StatCard icon={<Users className="w-4 h-4" />} label="This week" value={counts.this_week} />
+            </div>
+          )}
+
+          {/* SETTINGS tab (mobile & desktop) */}
+          {tab === 'settings' && (
+            <div className="py-6 space-y-3">
+              <div className="bg-white border rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Export CSV</div>
+                    <div className="text-sm text-neutral-500">Download rows for the current range.</div>
+                  </div>
+                  <button onClick={downloadCSV} className="px-3 py-2 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 inline-flex items-center gap-2">
+                    <Download className="w-4 h-4" /> Export
+                  </button>
+                </div>
+              </div>
+              <div className="bg-white border rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">Sign out</div>
+                    <div className="text-sm text-neutral-500">End your admin session.</div>
+                  </div>
+                  <button onClick={handleLogout} className="px-3 py-2 rounded-lg border inline-flex items-center gap-2">
+                    <LogOut className="w-4 h-4" /> Log Out
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* HOME & CALENDAR (card list + actions) */}
+          {(tab === 'home' || tab === 'calendar') && (
+            <div className="bg-white border rounded-xl overflow-hidden">
+              <div className="divide-y">
+                {loading && rows.length === 0 ? (
+                  <>
+                    <SkeletonCard />
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </>
+                ) : filteredRows.length === 0 ? (
+                  <div className="p-8 text-center text-neutral-500">No bookings found.</div>
+                ) : (
+                  pageRows.map(row => (
+                    <div key={row.id} className="p-4 sm:p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-medium text-neutral-900 truncate">{row.name || '—'}</div>
+                        <div className="text-sm text-neutral-600 truncate">
+                          {row.service_type || 'Service'} • {row.preferred_date}{row.preferred_time ? ` • ${row.preferred_time}` : ''}
+                        </div>
+                        <div className="text-xs text-neutral-500 truncate">{row.email}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusPill status={row.status} />
+                          <button
+                            onClick={() => setContactFor(row.id)}
+                            className="text-xs px-2 py-1 rounded border hover:bg-neutral-50 inline-flex items-center gap-1"
+                          >
+                            Contact
+                          </button>
+                          {contactFor === row.id && (
+                            <ContactSheet
+                              phone={row.whatsapp}
+                              onClose={() => setContactFor(null)}
+                              onWhatsApp={() => openWhatsApp(row.whatsapp)}
+                              onCall={() => callNumber(row.whatsapp)}
+                              onCopy={() => copyNumber(row.whatsapp)}
+                            />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 sm:self-end">
+                        {row.status !== 'confirmed' && (
+                          <button onClick={() => updateStatus(row.id, 'confirmed')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Confirm</button>
+                        )}
+                        {row.status !== 'pending' && (
+                          <button onClick={() => updateStatus(row.id, 'pending')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Pending</button>
+                        )}
+                        {row.status !== 'cancelled' && (
+                          <button onClick={() => updateStatus(row.id, 'cancelled')} className="px-3 py-1.5 rounded-lg border text-xs hover:bg-neutral-50">Cancel</button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Pagination */}
+              {filteredRows.length > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-neutral-50">
+                  <div className="text-xs text-neutral-500">
+                    Page {page} of {Math.max(1, Math.ceil(filteredRows.length / pageSize))} • {filteredRows.length} row{filteredRows.length === 1 ? '' : 's'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Prev</button>
+                    <button onClick={() => setPage(p => Math.min(Math.max(1, Math.ceil(filteredRows.length / pageSize)), p + 1))} disabled={page >= Math.ceil(filteredRows.length / pageSize)} className="px-3 py-1.5 rounded-lg border text-xs disabled:opacity-40">Next</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* FAB (Home/Calendar only) */}
+      {(tab === 'home' || tab === 'calendar') && (
+        <button
+          onClick={() => window.open('/book', '_blank')}
+          className="fixed bottom-20 right-6 md:hidden rounded-full shadow-lg bg-neutral-900 text-white p-4"
+          title="Add booking"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Bottom Navigation (mobile only) */}
+      <nav className="fixed bottom-0 left-0 right-0 md:hidden bg-white border-t shadow-sm z-40">
+        <div className="max-w-7xl mx-auto grid grid-cols-4 text-xs">
+          <TabButton active={tab==='home'}     onClick={()=>{ setTab('home');     setPage(1); }} icon={<HomeIcon className="w-5 h-5" />}     label="Home"     bump={bumpHome} />
+          <TabButton active={tab==='calendar'} onClick={()=>{ setTab('calendar'); setPage(1); }} icon={<CalendarDays className="w-5 h-5" />} label="Calendar" bump={bumpCalendar} />
+          <TabButton active={tab==='stats'}    onClick={()=>{ setTab('stats'); }}                 icon={<BarChart2 className="w-5 h-5" />}   label="Stats" />
+          <TabButton active={tab==='settings'} onClick={()=>{ setTab('settings'); }}              icon={<SettingsIcon className="w-5 h-5" />} label="Settings" />
+        </div>
+      </nav>
 
       {/* Toasts */}
-      <div className="fixed left-1/2 -translate-x-1/2 bottom-4 z-40 space-y-2 w-[92%] max-w-sm">
+      <div className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-4 z-50 space-y-2 w-[92%] max-w-sm">
         {toastList.map(t => (
           <div
             key={t.id}
@@ -556,6 +587,20 @@ export default function AdminDashboard({
         ))}
       </div>
     </div>
+  );
+}
+
+/* ---------- Small components ---------- */
+
+function TabButton({ active, onClick, icon, label, bump }:{
+  active: boolean; onClick: ()=>void; icon: React.ReactNode; label: string; bump?: boolean;
+}) {
+  return (
+    <button onClick={onClick} className={`relative flex flex-col items-center justify-center py-2 ${active ? 'text-black' : 'text-neutral-500'}`}>
+      {icon}
+      <span className="mt-0.5">{label}</span>
+      {bump && <span className="absolute top-1 right-6 h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />}
+    </button>
   );
 }
 
