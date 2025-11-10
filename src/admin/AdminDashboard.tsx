@@ -13,6 +13,9 @@ import HistoryPage from './HistoryPage';
 // ✅ ADDED: import WhatsApp helpers (from the helper file you created)
 import { buildWhatsAppLink, bookingMessageTemplate, formatDateTime } from '../utils/whatsapp';
 
+// ✅ ADDED: import Change Password form
+import ChangePasswordForm from './ChangePasswordForm';
+
 // ---------- Types ----------
 type BookingRow = {
   id: string;
@@ -593,6 +596,23 @@ export default function AdminDashboard({
             {/* SETTINGS tab */}
             {tab === 'settings' && (
               <div className="py-6 space-y-3">
+                <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl p-6 shadow-sm">
+                  <div className="mb-4">
+                    <div className="font-medium text-lg mb-1">Change Password</div>
+                    <div className="text-sm text-neutral-500">Update your admin account password.</div>
+                  </div>
+                  <ChangePasswordForm
+                    token={token}
+                    onSuccess={() => {
+                      pushToast('success', 'Password changed successfully. Please log in again.');
+                      setTimeout(() => handleLogout(), 2000);
+                    }}
+                    onError={(message) => {
+                      pushToast('error', message);
+                    }}
+                  />
+                </div>
+
                 <div className="bg-white border border-[#C9A9A6]/20 rounded-2xl p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
